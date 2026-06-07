@@ -6,6 +6,7 @@
 
 新增战略目标：
 - 扩展高配因子库，但先做 Factor Registry 和评估闭环，不直接堆未验证因子。
+- 因子/Block 库设计原则：重点清晰、准备完备、架构灵活。
 
 ## Qoder 任务
 
@@ -343,6 +344,18 @@
 验收：
 - StrategyQuant X B143 的 building-block 思路进入项目资产。
 - 因子库升级为 Factor + Block Library。
+
+状态：已完成。
+
+### C10: 因子/Block 库设计准则
+
+交付：
+- `docs/FACTOR_BLOCK_LIBRARY_DESIGN_PRINCIPLES.md`
+
+验收：
+- 明确重点清晰、准备完备、架构灵活。
+- 明确 F0/F1/F2 落地顺序。
+- 明确不盲目复制 SQX 548 blocks。
 
 状态：已完成。
 

@@ -18,6 +18,7 @@
 ## SQX Local Study
 
 - `docs/SQX_LOCAL_BLOCK_INVENTORY.md`
+- `docs/FACTOR_BLOCK_LIBRARY_DESIGN_PRINCIPLES.md`
 
 ## Next Agent Prompts
 

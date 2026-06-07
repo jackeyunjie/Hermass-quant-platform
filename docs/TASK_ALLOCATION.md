@@ -81,6 +81,9 @@
 - Qoder 设计中把 `stop_loss_pct` 依赖 `positions` 并在 MVP Preview 中拒绝，这会破坏“合法止损策略可预览”的 MVP 链路。
 - Codex 裁决：`stop_loss_pct` 在 Phase 1 Preview 中不应导致整体拒绝；应标记为 `requires_position_context`，在 mock 模式给 deterministic 估算，在 DuckDB preview 中只预览 entry/filter，exit stop loss 留给 backtest/positions 上下文。
 
+下一轮任务：
+- `agents/QODER_NEXT_TASK_PHASE1_IMPLEMENTATION_PATCH.md`
+
 ## Kimi 任务
 
 ### K1: Light Backtest 性能基准
@@ -170,6 +173,24 @@
 - JSONL 字段完整。
 - 注意：初次复核发现并行运行会竞争同一个 synthetic DuckDB 临时文件；Codex 已修复为进程级唯一临时库路径。
 
+### K5: 真实数据 Benchmark Runbook
+
+交付：
+- 真实数据前置体检流程。
+- `benchmarks/validate_real_data.py` 脚本规格。
+- Phase 2 hot path gates。
+- CI/本地验收策略。
+- 对现有 benchmark 的改进建议。
+
+验收：
+- 能指导 Codex 在 `p116_foundation.duckdb` 和 `state_cube.duckdb` 就绪后跑出真实基线。
+- 明确 synthetic smoke 与 real benchmark 的区别。
+
+状态：新增任务。
+
+下一轮任务：
+- `agents/KIMI_NEXT_TASK_REAL_DATA_BENCHMARK_RUNBOOK.md`
+
 ## Codex 任务
 
 ### C1: 项目协作资产
@@ -222,6 +243,18 @@
 - Qoder 有明确 Phase 1 API/Preview/DDL 任务。
 - Kimi 有明确 benchmark 脚本任务。
 - 两份提示词都包含验收命令或输出结构。
+
+状态：已完成。
+
+### C6: 下一轮 Agent 派工 2
+
+交付：
+- `agents/QODER_NEXT_TASK_PHASE1_IMPLEMENTATION_PATCH.md`
+- `agents/KIMI_NEXT_TASK_REAL_DATA_BENCHMARK_RUNBOOK.md`
+
+验收：
+- Qoder 任务明确要求修正 stop loss preview context。
+- Kimi 任务明确要求真实数据 runbook 和 Phase 2 hot path gates。
 
 状态：已完成。
 

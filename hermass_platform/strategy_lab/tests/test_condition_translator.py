@@ -84,7 +84,8 @@ class TestMAGoldenCross:
         assert result.sql_expr is not None
         assert "ma_5" in result.sql_expr
         assert "ma_20" in result.sql_expr
-        assert "LAG" in result.sql_expr
+        assert "lag" in result.sql_expr.lower()
+        assert "partition by symbol order by date" in result.sql_expr.lower()
         assert ">" in result.sql_expr
         assert "<=" in result.sql_expr
 

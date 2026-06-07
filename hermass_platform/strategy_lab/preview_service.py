@@ -35,6 +35,109 @@ from .dsl_validator import ValidationLevel, validate_dsl
 
 
 # ---------------------------------------------------------------------------
+# DuckDB Preview Provider
+# ---------------------------------------------------------------------------
+
+class DuckDBPreviewProvider:
+    """Real DuckDB COUNT(*) preview for FULLY_SUPPORTED conditions.
+
+    Only executes SELECT COUNT(*) queries. No SELECT *.
+    Table and column names come exclusively from the registry/translator.
+    """
+
+    def __init__(self, duckdb_path: str | None = None) -> None:
+        self.duckdb_path = duckdb_path
+        self._con = None
+
+    def _connect(self):
+        if self._con is not None:
+            return self._con
+        if self.duckdb_path is None:
+            raise RuntimeError("duckdb_path not configured")
+        import duckdb
+
+        self._con = duckdb.connect(self.duckdb_path)
+        return self._con
+
+    def count_hits(
+        self,
+        condition: ConditionBlock,
+        registry: ConditionRegistry,
+    ) -> int | None:
+        """Execute COUNT(*) for a FULLY_SUPPORTED condition.
+
+        Returns:
+            Hit count, or None if translation/DuckDB fails.
+        """
+        sql = self.build_count_sql(condition, registry)
+        if sql is None:
+            return None
+
+        try:
+            con = self._connect()
+            row = con.execute(sql).fetchone()
+            if row is None:
+                return None
+            return int(row[0])
+        except Exception:
+            return None
+
+    def build_count_sql(
+        self,
+        condition: ConditionBlock,
+        registry: ConditionRegistry,
+    ) -> str | None:
+        """Build the DuckDB COUNT SQL for a preview condition.
+
+        Exposed for tests because SQL shape is part of the preview safety contract.
+        """
+        try:
+            result = translate_condition(condition, registry, "duckdb")
+        except (KeyError, ValueError):
+            return None
+
+        if result.sql_expr is None:
+            return None
+
+        table = self._resolve_table(result.required_tables)
+        if table is None:
+            return None
+
+        expr = result.sql_expr
+        if "lag(" in expr.lower():
+            sql = (
+                "SELECT COUNT(*) AS hit_count "
+                f"FROM (SELECT 1 FROM {table} QUALIFY {expr}) AS preview_hits"
+            )
+        else:
+            sql = f"SELECT COUNT(*) AS hit_count FROM {table} WHERE {expr}"
+
+        if "SELECT *" in sql.upper():
+            raise RuntimeError("SQL preview must not contain SELECT *")
+        return sql
+
+    @staticmethod
+    def _resolve_table(required_tables: list[str]) -> str | None:
+        """Pick the primary table for the COUNT query.
+
+        Uses explicit translator output; no user parameter拼接.
+        """
+        if not required_tables:
+            return None
+        # Prefer daily_bars > state_cube > stock_info
+        priority = ["daily_bars", "state_cube", "stock_info"]
+        for t in priority:
+            if t in required_tables:
+                return t
+        return required_tables[0]
+
+    def close(self) -> None:
+        if self._con is not None:
+            self._con.close()
+            self._con = None
+
+
+# ---------------------------------------------------------------------------
 # Mock Data Provider
 # ---------------------------------------------------------------------------
 
@@ -120,6 +223,7 @@ class PreviewConfig:
 
     registry: ConditionRegistry = field(default_factory=ConditionRegistry.default)
     mock_provider: MockDataProvider = field(default_factory=MockDataProvider)
+    duckdb_path: str | None = None
 
 
 class PreviewService:
@@ -134,6 +238,7 @@ class PreviewService:
         self.config = config or PreviewConfig()
         self._registry = self.config.registry
         self._mock = self.config.mock_provider
+        self._duckdb = DuckDBPreviewProvider(self.config.duckdb_path)
 
     def preview(
         self,
@@ -282,20 +387,41 @@ class PreviewService:
                 section_has_context = True
 
             # Estimate hits
-            if data_source == "mock":
+            estimated: int | None = None
+            notes = spec.preview_notes or ""
+
+            if spec.preview_support == PreviewSupport.UNSUPPORTED:
+                estimated = None
+            elif spec.preview_support == PreviewSupport.REQUIRES_BACKTEST_CONTEXT:
                 estimated = self._mock.estimate_hits(
                     cond.condition_type, cond.params, spec.preview_support
                 )
+                notes = notes or "Requires backtest context for accurate preview"
+            elif spec.preview_support == PreviewSupport.MOCK_ONLY:
+                estimated = self._mock.estimate_hits(
+                    cond.condition_type, cond.params, spec.preview_support
+                )
+                notes = notes or "Mock-only preview; no real data query"
+            elif data_source == "duckdb":
+                if self.config.duckdb_path:
+                    estimated = self._duckdb.count_hits(cond, self._registry)
+                    if estimated is None:
+                        notes = notes or "DuckDB query failed; fallback to mock"
+                        estimated = self._mock.estimate_hits(
+                            cond.condition_type, cond.params, spec.preview_support
+                        )
+                else:
+                    notes = notes or "duckdb_path not configured; fallback to mock"
+                    estimated = self._mock.estimate_hits(
+                        cond.condition_type, cond.params, spec.preview_support
+                    )
             else:
-                # DuckDB preview: try to get actual count, fallback to mock
-                estimated = self._estimate_duckdb(cond, spec)
+                estimated = self._mock.estimate_hits(
+                    cond.condition_type, cond.params, spec.preview_support
+                )
 
             if estimated is not None:
                 section_total_hits += estimated
-
-            notes = spec.preview_notes
-            if spec.preview_support == PreviewSupport.REQUIRES_BACKTEST_CONTEXT:
-                notes = notes or "Requires backtest context for accurate preview"
 
             items.append(
                 ConditionPreviewItem(
@@ -315,21 +441,9 @@ class PreviewService:
             has_context_required=section_has_context,
         )
 
-    def _estimate_duckdb(
-        self, cond: ConditionBlock, spec: Any
-    ) -> int | None:
-        """Estimate hits using DuckDB (stub - falls back to mock for now).
-
-        In full implementation, this would:
-            1. Translate condition to SQL.
-            2. Execute COUNT(*) against DuckDB.
-            3. Return actual hit count.
-        """
-        # Stub: delegate to mock provider
-        # SQL preview must not use SELECT *
-        return self._mock.estimate_hits(
-            cond.condition_type, cond.params, spec.preview_support
-        )
+    def close(self) -> None:
+        """Close any open DuckDB connections."""
+        self._duckdb.close()
 
     def preview_condition_sql(
         self,

@@ -193,9 +193,10 @@ def _translate_ma_golden_cross(
     col_slow = f"ma_{slow}"
 
     if dialect == "duckdb":
+        window = "PARTITION BY symbol ORDER BY date"
         sql = (
             f"({col_fast} > {col_slow} AND "
-            f"LAG({col_fast}) <= LAG({col_slow}))"
+            f"lag({col_fast}) OVER ({window}) <= lag({col_slow}) OVER ({window}))"
         )
     else:
         sql = None
@@ -226,9 +227,10 @@ def _translate_ma_death_cross(
     col_slow = f"ma_{slow}"
 
     if dialect == "duckdb":
+        window = "PARTITION BY symbol ORDER BY date"
         sql = (
             f"({col_fast} < {col_slow} AND "
-            f"LAG({col_fast}) >= LAG({col_slow}))"
+            f"lag({col_fast}) OVER ({window}) >= lag({col_slow}) OVER ({window}))"
         )
     else:
         sql = None
@@ -261,7 +263,11 @@ def _translate_price_cross_ma(
 
     if direction == "above":
         if dialect == "duckdb":
-            sql = f"({col_price} > {col_ma} AND LAG({col_price}) <= LAG({col_ma}))"
+            window = "PARTITION BY symbol ORDER BY date"
+            sql = (
+                f"({col_price} > {col_ma} AND "
+                f"lag({col_price}) OVER ({window}) <= lag({col_ma}) OVER ({window}))"
+            )
         else:
             sql = None
         if dialect == "polars":
@@ -273,7 +279,11 @@ def _translate_price_cross_ma(
             polars = None
     else:  # below
         if dialect == "duckdb":
-            sql = f"({col_price} < {col_ma} AND LAG({col_price}) >= LAG({col_ma}))"
+            window = "PARTITION BY symbol ORDER BY date"
+            sql = (
+                f"({col_price} < {col_ma} AND "
+                f"lag({col_price}) OVER ({window}) >= lag({col_ma}) OVER ({window}))"
+            )
         else:
             sql = None
         if dialect == "polars":

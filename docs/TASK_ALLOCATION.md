@@ -368,6 +368,13 @@
 
 状态：已完成派工。
 
+状态更新：
+- Qoder 已完成实现记录，文件：`data/research/conversations/agent-runs/2026-06-07-qoder-phase1-duckdb-preview-storage-audit.md`。
+- Codex 已复核并修正 DuckDB Preview SQL：窗口函数使用 `PARTITION BY symbol ORDER BY date`，QUALIFY 子查询使用 `SELECT 1`，不允许 `SELECT *`。
+- 新增 `hermass_platform/strategy_lab/storage.py`、`hermass_platform/strategy_lab/audit.py` 和 DuckDB preview/storage/audit 测试。
+- 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/strategy_lab/tests -q`，188 passed。
+- 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m py_compile hermass_platform/strategy_lab/*.py`，通过。
+
 ### C8: 高配因子库派工
 
 交付：

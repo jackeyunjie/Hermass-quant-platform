@@ -28,6 +28,9 @@
 - `agents/SOURCE_FACTOR_REGISTRY_CODE_SPEC.md`
 - `hermass_platform/factors/`
 - `config/factors/`
+- `data/research/conversations/agent-runs/2026-06-07-qoder-phase1-duckdb-preview-storage-audit.md`
+- `hermass_platform/strategy_lab/storage.py`
+- `hermass_platform/strategy_lab/audit.py`
 
 ## Next Agent Prompts
 

@@ -4,6 +4,9 @@
 
 把最终实施方案压缩成 Phase 0/1 MVP，并建立可复用协作机制。
 
+新增战略目标：
+- 扩展高配因子库，但先做 Factor Registry 和评估闭环，不直接堆未验证因子。
+
 ## Qoder 任务
 
 ### Q1: DSL v2 MVP Schema
@@ -207,6 +210,23 @@
 下一轮任务 2：
 - `agents/KIMI_NEXT_TASK_VALIDATE_AND_BENCHMARK_PATCH.md`
 
+### K6: 高配因子库研究
+
+交付：
+- 50+ 候选因子优先级。
+- A 股数据可得性。
+- 因子评估框架。
+- F0/F1/F2 路线。
+
+验收：
+- 明确哪些因子进入 MVP+，哪些进入 research backlog。
+- 每个候选因子有数据依赖和风险。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_FACTOR_LIBRARY_RESEARCH.md`
+
 ## Codex 任务
 
 ### C1: 项目协作资产
@@ -283,6 +303,20 @@
 验收：
 - Qoder 任务要求直接实现 Phase 1 metadata/api_models/preview_service 第一批代码。
 - Kimi 任务要求直接实现 `validate_real_data.py` 和 benchmark CLI/分阶段计时改进。
+
+状态：已完成。
+
+### C8: 高配因子库派工
+
+交付：
+- `docs/FACTOR_LIBRARY_EXPANSION_PLAN.md`
+- `agents/KIMI_NEXT_TASK_FACTOR_LIBRARY_RESEARCH.md`
+- `agents/QODER_NEXT_TASK_FACTOR_LIBRARY_ARCHITECTURE.md`
+- `data/research/conversations/decisions/0007-factor-library-expansion-direction.md`
+
+验收：
+- 高配因子库方向进入项目决策。
+- Kimi/Qoder 有明确下一步。
 
 状态：已完成。
 

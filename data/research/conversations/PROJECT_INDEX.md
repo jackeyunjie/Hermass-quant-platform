@@ -10,6 +10,7 @@
 - [[decisions/0004-phase1-preview-stop-loss-context]]
 - [[decisions/0005-phase2-hot-path-gates]]
 - [[decisions/0006-phase1-preview-metadata-design]]
+- [[decisions/0007-factor-library-expansion-direction]]
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
@@ -22,6 +23,8 @@
 - `agents/KIMI_NEXT_TASK_REAL_DATA_BENCHMARK_RUNBOOK.md`
 - `agents/QODER_NEXT_TASK_PHASE1_CODE_PATCH.md`
 - `agents/KIMI_NEXT_TASK_VALIDATE_AND_BENCHMARK_PATCH.md`
+- `agents/KIMI_NEXT_TASK_FACTOR_LIBRARY_RESEARCH.md`
+- `agents/QODER_NEXT_TASK_FACTOR_LIBRARY_ARCHITECTURE.md`
 
 ## 当前目标
 

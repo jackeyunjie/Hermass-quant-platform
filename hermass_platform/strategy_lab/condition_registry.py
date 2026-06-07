@@ -38,6 +38,24 @@ class TranslatorDialect(str, Enum):
     BOTH = "both"
 
 
+class PreviewSupport(str, Enum):
+    """条件在 Preview 中的支持状态。"""
+
+    FULLY_SUPPORTED = "fully_supported"
+    MOCK_ONLY = "mock_only"
+    REQUIRES_BACKTEST_CONTEXT = "requires_backtest_context"
+    UNSUPPORTED = "unsupported"
+
+
+class ContextRequirement(str, Enum):
+    """条件执行所需的上下文类型。"""
+
+    NONE = "none"
+    POSITION = "position"
+    PORTFOLIO = "portfolio"
+    MARKET_STATE = "market_state"
+
+
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
@@ -80,6 +98,11 @@ class ConditionSpec:
         translator: Supported translation dialect(s).
         description: Human-readable description.
         examples: Example parameter sets for documentation.
+        required_columns: Static column dependency templates.
+        required_tables: Static table dependencies.
+        context_requirements: Runtime context needed beyond static data.
+        preview_support: Preview support classification.
+        preview_notes: Human-readable explanation for preview limitations.
     """
 
     condition_type: str
@@ -89,12 +112,43 @@ class ConditionSpec:
     description: str = ""
     examples: list[dict[str, Any]] = field(default_factory=list)
 
+    # 数据源依赖（静态声明）
+    required_columns: list[str] = field(default_factory=list)
+    required_tables: list[str] = field(default_factory=list)
+
+    # 执行上下文依赖（运行时）
+    context_requirements: list[ContextRequirement] = field(default_factory=list)
+
+    # Preview 支持状态
+    preview_support: PreviewSupport = PreviewSupport.FULLY_SUPPORTED
+    preview_notes: str = ""
+
     def get_param(self, name: str) -> ParamSchema | None:
         """Get parameter schema by name."""
         for p in self.params:
             if p.name == name:
                 return p
         return None
+
+    def resolve_required_columns(self, params: dict[str, Any]) -> list[str]:
+        """Resolve required column templates using condition params.
+
+        Adds ``*_lower`` aliases for string params so timeframe values like
+        ``D1`` resolve to translator-compatible column names such as
+        ``close_d1``.
+        """
+        format_params: dict[str, Any] = dict(params)
+        for key, value in params.items():
+            if isinstance(value, str):
+                format_params[f"{key}_lower"] = value.lower()
+
+        resolved: list[str] = []
+        for col in self.required_columns:
+            try:
+                resolved.append(col.format(**format_params))
+            except KeyError:
+                resolved.append(col)
+        return resolved
 
     def get_required_params(self) -> list[ParamSchema]:
         """Get all required parameters."""
@@ -325,6 +379,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Fast MA crosses above slow MA (golden cross)",
         examples=[{"fast_period": 5, "slow_period": 20}],
+        required_columns=["ma_{fast_period}", "ma_{slow_period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
     ConditionSpec(
         condition_type="ma_death_cross",
@@ -348,6 +405,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Fast MA crosses below slow MA (death cross)",
         examples=[{"fast_period": 5, "slow_period": 20}],
+        required_columns=["ma_{fast_period}", "ma_{slow_period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
     ConditionSpec(
         condition_type="price_cross_ma",
@@ -378,6 +438,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Price crosses above/below a moving average",
         examples=[{"timeframe": "D1", "ma_period": 20, "direction": "above"}],
+        required_columns=["close_{timeframe_lower}", "ma_{ma_period}_{timeframe_lower}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
     # -- State Conditions -------------------------------------------------
     ConditionSpec(
@@ -402,6 +465,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="State hex value is in the allowed set",
         examples=[{"timeframe": "D1", "values": ["0x01", "0x02"]}],
+        required_columns=["state_hex_{timeframe_lower}"],
+        required_tables=["state_cube"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
     ConditionSpec(
         condition_type="state_ef_count",
@@ -425,6 +491,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="EF (Expansion Factor) count comparison",
         examples=[{"operator": ">=", "value": 3}],
+        required_columns=["ef_count"],
+        required_tables=["state_cube"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
     # -- Volume Conditions ------------------------------------------------
     ConditionSpec(
@@ -456,6 +525,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Volume ratio compared to lookback average",
         examples=[{"lookback": 20, "operator": ">", "value": 1.5}],
+        required_columns=["volume", "volume_ma_{lookback}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
     # -- Industry Filters -------------------------------------------------
     ConditionSpec(
@@ -473,6 +545,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Stock industry is in the include list",
         examples=[{"values": ["电子", "医药生物"]}],
+        required_columns=["industry"],
+        required_tables=["stock_info"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
     ConditionSpec(
         condition_type="industry_exclude",
@@ -489,6 +564,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Stock industry is NOT in the exclude list",
         examples=[{"values": ["银行", "房地产"]}],
+        required_columns=["industry"],
+        required_tables=["stock_info"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
     # -- Risk Conditions --------------------------------------------------
     ConditionSpec(
@@ -506,6 +584,11 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Exit when loss exceeds specified percentage",
         examples=[{"value": 0.08}],
+        required_columns=["close"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="Stop loss requires position context (entry_price). Preview returns estimated hit count based on price distribution.",
     ),
     ConditionSpec(
         condition_type="take_profit_pct",
@@ -522,6 +605,11 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Exit when profit exceeds specified percentage",
         examples=[{"value": 0.15}],
+        required_columns=["close"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="Take profit requires position context (entry_price). Preview returns estimated hit count based on price distribution.",
     ),
     # -- Market Filters ---------------------------------------------------
     ConditionSpec(
@@ -538,5 +626,9 @@ _MVP_CONDITIONS: list[ConditionSpec] = [
         translator=TranslatorDialect.BOTH,
         description="Filter limit-up (涨停) stocks",
         examples=[{"allow": False}],
+        required_columns=["is_limit_up"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.MARKET_STATE],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
     ),
 ]

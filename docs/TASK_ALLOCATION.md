@@ -347,6 +347,12 @@
 
 状态：已完成。
 
+状态更新：
+- Qoder 已完成 Phase 1 API model / preview service 补丁，文件：`data/research/conversations/agent-runs/2026-06-06-qoder-phase1-code-patch.md`。
+- Codex 已复核并修正两点：`PreviewService.input_hash` 改为 DSL 内容哈希；`ConditionSpec.resolve_required_columns()` 对齐 translator 字段名。
+- 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/strategy_lab/tests -q`，162 passed。
+- 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m py_compile hermass_platform/strategy_lab/*.py`，通过。
+
 ### C8: 高配因子库派工
 
 交付：

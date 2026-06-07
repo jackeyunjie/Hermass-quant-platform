@@ -8,7 +8,9 @@ from hermass_platform.strategy_lab.condition_registry import (
     ConditionCategory,
     ConditionRegistry,
     ConditionSpec,
+    ContextRequirement,
     ParamSchema,
+    PreviewSupport,
     TranslatorDialect,
     ValidationResult,
 )
@@ -182,6 +184,61 @@ class TestDefaultRegistry:
         assert fast_param.param_type == "integer"
         assert fast_param.constraints["minimum"] == 1
         assert fast_param.constraints["maximum"] == 252
+
+    def test_all_mvp_conditions_have_preview_support(self, default_registry: ConditionRegistry) -> None:
+        """All MVP conditions must have a defined preview_support."""
+        for spec in default_registry.list_all():
+            assert spec.preview_support is not None
+            assert isinstance(spec.preview_support, PreviewSupport)
+
+    def test_stop_loss_pct_preview_metadata(self, default_registry: ConditionRegistry) -> None:
+        """stop_loss_pct must have correct preview metadata."""
+        spec = default_registry.get("stop_loss_pct")
+        assert spec.required_tables == ["daily_bars"]
+        assert ContextRequirement.POSITION in spec.context_requirements
+        assert spec.preview_support == PreviewSupport.REQUIRES_BACKTEST_CONTEXT
+        assert "entry_price" in spec.preview_notes
+
+    def test_take_profit_pct_preview_metadata(self, default_registry: ConditionRegistry) -> None:
+        """take_profit_pct must have correct preview metadata."""
+        spec = default_registry.get("take_profit_pct")
+        assert spec.required_tables == ["daily_bars"]
+        assert ContextRequirement.POSITION in spec.context_requirements
+        assert spec.preview_support == PreviewSupport.REQUIRES_BACKTEST_CONTEXT
+
+    def test_stop_loss_pct_no_positions_table(self, default_registry: ConditionRegistry) -> None:
+        """stop_loss_pct must NOT include positions in required_tables."""
+        spec = default_registry.get("stop_loss_pct")
+        assert "positions" not in spec.required_tables
+
+    def test_ma_golden_cross_fully_supported(self, default_registry: ConditionRegistry) -> None:
+        """ma_golden_cross must be fully supported for preview."""
+        spec = default_registry.get("ma_golden_cross")
+        assert spec.preview_support == PreviewSupport.FULLY_SUPPORTED
+        assert spec.required_tables == ["daily_bars"]
+        assert len(spec.required_columns) > 0
+
+    def test_limit_up_filter_has_market_state_context(self, default_registry: ConditionRegistry) -> None:
+        """limit_up_filter requires market state context."""
+        spec = default_registry.get("limit_up_filter")
+        assert ContextRequirement.MARKET_STATE in spec.context_requirements
+        assert spec.preview_support == PreviewSupport.FULLY_SUPPORTED
+
+    def test_price_cross_ma_resolves_translator_columns(self, default_registry: ConditionRegistry) -> None:
+        """Template dependencies should resolve to translator-compatible columns."""
+        spec = default_registry.get("price_cross_ma")
+        columns = spec.resolve_required_columns(
+            {"timeframe": "D1", "ma_period": 20, "direction": "above"}
+        )
+        assert columns == ["close_d1", "ma_20_d1"]
+
+    def test_state_hex_resolves_lowercase_timeframe(self, default_registry: ConditionRegistry) -> None:
+        """State column templates should lowercase timeframe params."""
+        spec = default_registry.get("state_hex_in")
+        columns = spec.resolve_required_columns(
+            {"timeframe": "W1", "values": ["0x01", "0x02"]}
+        )
+        assert columns == ["state_hex_w1"]
 
 
 # ---------------------------------------------------------------------------

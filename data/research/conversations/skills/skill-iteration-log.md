@@ -42,6 +42,23 @@
 - 默认测试解释器为 `/Users/lv111101/.pyenv/versions/3.11.12/bin/python`，除非项目建立 `.venv`。
 - Phase 0 验收命令固定为 strategy_lab 测试 + py_compile + AC 烟测。
 
+## 2026-06-06 Kimi Benchmark 输出后的 Skill 更新点
+
+`hermass-backtest-mvp` 后续应加入：
+
+- benchmark 脚本必须支持 `--synthetic` 和 `--output`。
+- JSONL 字段必须包含 p50/p95、data_source、platform。
+- synthetic 结果只验证脚本和热路径，不作为真实性能承诺。
+- 多个 benchmark 不应并行共用同一个 DuckDB 临时文件；当前 Kimi 脚本已修复为进程级唯一临时库路径。
+
+## 2026-06-06 Qoder Phase 1 设计后的 Skill 更新点
+
+`hermass-dsl-builder` 后续应加入：
+
+- Condition registry 可以声明静态依赖，但 Preview 不能简单因为 `stop_loss_pct` 需要持仓上下文而拒绝整个策略。
+- 条件 metadata 需要区分数据依赖和执行上下文依赖。
+- `stop_loss_pct` 属于 backtest/position context，不等于 Phase 1 blocked condition。
+
 ## 待拆分 Skill
 
 - `hermass-dsl-builder`

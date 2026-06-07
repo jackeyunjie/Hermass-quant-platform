@@ -7,6 +7,7 @@
 - [[decisions/0001-agent-collaboration-system]]
 - [[decisions/0002-kimi-performance-data-architecture]]
 - [[decisions/0003-qoder-phase-0-accepted-with-followups]]
+- [[decisions/0004-phase1-preview-stop-loss-context]]
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]

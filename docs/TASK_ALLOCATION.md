@@ -66,6 +66,21 @@
 - 每个 API 有请求/响应 schema。
 - 每个 API 标注业务逻辑所在 service 文件。
 
+状态：Qoder 已完成 Phase 1 设计，Codex 已复核，待实现。
+
+交付：
+- `agents/PHASE1_API_PREVIEW_DESIGN.md`
+
+采纳结论：
+- `ConditionSpec` 应增加字段/表依赖元数据。
+- Phase 1 只建 `user_strategies`、`strategy_versions`、`strategy_backtests`、`strategy_audit_log`。
+- Web 路由只做参数解析和 service 调用。
+- Preview 必须先过 DSL 校验和红线检查，禁止 `SELECT *`。
+
+需修正后再实现：
+- Qoder 设计中把 `stop_loss_pct` 依赖 `positions` 并在 MVP Preview 中拒绝，这会破坏“合法止损策略可预览”的 MVP 链路。
+- Codex 裁决：`stop_loss_pct` 在 Phase 1 Preview 中不应导致整体拒绝；应标记为 `requires_position_context`，在 mock 模式给 deterministic 估算，在 DuckDB preview 中只预览 entry/filter，exit stop loss 留给 backtest/positions 上下文。
+
 ## Kimi 任务
 
 ### K1: Light Backtest 性能基准
@@ -132,6 +147,28 @@
 - 真实数据不可用时，先提供 synthetic fixture，但标注不可作为最终性能承诺。
 
 状态：新增任务。
+
+状态：已完成，Codex 已复核。
+
+交付：
+- `benchmarks/light_backtest_perf.py`
+- `benchmarks/indicator_precompute_vs_compute.py`
+- `benchmarks/duckdb_vs_polars.py`
+- `benchmarks/state_cube_query.py`
+- `benchmarks/_synthetic.py`
+- `benchmarks/README.md`
+- `data/research/conversations/agent-runs/2026-06-06-kimi-benchmark-scripts.md`
+
+复核命令：
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python benchmarks/light_backtest_perf.py --synthetic --output outputs/benchmarks/light_backtest_synthetic.jsonl`
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python benchmarks/indicator_precompute_vs_compute.py --synthetic --output outputs/benchmarks/indicator_synthetic.jsonl`
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python benchmarks/duckdb_vs_polars.py --synthetic --output outputs/benchmarks/duckdb_vs_polars_synthetic.jsonl`
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python benchmarks/state_cube_query.py --synthetic --output outputs/benchmarks/state_cube_synthetic.jsonl`
+
+复核结果：
+- 4 个脚本均顺序运行通过。
+- JSONL 字段完整。
+- 注意：初次复核发现并行运行会竞争同一个 synthetic DuckDB 临时文件；Codex 已修复为进程级唯一临时库路径。
 
 ## Codex 任务
 

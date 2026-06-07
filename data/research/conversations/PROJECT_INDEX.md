@@ -15,6 +15,10 @@
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
 
+## SQX Local Study
+
+- `docs/SQX_LOCAL_BLOCK_INVENTORY.md`
+
 ## Next Agent Prompts
 
 - `agents/QODER_NEXT_TASK_PHASE1_API_PREVIEW.md`

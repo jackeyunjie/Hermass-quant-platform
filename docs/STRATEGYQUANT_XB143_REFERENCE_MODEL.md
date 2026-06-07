@@ -19,6 +19,22 @@ SQX 将策略组件分为：
 - Exit types。
 - Custom data indicators。
 
+本地安装包 inventory 进一步显示，SQX snippets 中存在这些主要家族：
+
+- `Blocks/StrategyControl`
+- `Blocks/Comparisons`
+- `Blocks/BarAndTime`
+- `Blocks/Price`
+- `Blocks/CandlePatterns`
+- `ExitMethods`
+- `MoneyManagement`
+- `MonteCarlo`
+- `WhatIf`
+- `TradingOptions`
+- `TradeAnalysis`
+- `Columns`
+- `Stats`
+
 Hermass 对应：
 
 - Signal Blocks。

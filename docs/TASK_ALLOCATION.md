@@ -172,8 +172,21 @@
 - 最小 DSL 构造、校验、翻译烟测通过。
 
 待修正：
-- `pyproject.toml` 引用 `README.md`，但当前目录没有 `README.md`。
+- `pyproject.toml` 引用 `README.md` 的风险已修复。
 - 条件注册表目前没有显式字段依赖属性，字段依赖由 translator 返回；后续 Phase 1/2 应考虑把字段依赖前移到 registry，便于 preview/backtest 提前拒绝非 MVP 字段。
+
+### C5: 下一轮 Agent 派工
+
+交付：
+- `agents/QODER_NEXT_TASK_PHASE1_API_PREVIEW.md`
+- `agents/KIMI_NEXT_TASK_BENCHMARKS.md`
+
+验收：
+- Qoder 有明确 Phase 1 API/Preview/DDL 任务。
+- Kimi 有明确 benchmark 脚本任务。
+- 两份提示词都包含验收命令或输出结构。
+
+状态：已完成。
 
 ### C3: Phase 1 API 与预览
 

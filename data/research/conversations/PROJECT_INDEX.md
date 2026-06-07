@@ -11,6 +11,11 @@
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
 
+## Next Agent Prompts
+
+- `agents/QODER_NEXT_TASK_PHASE1_API_PREVIEW.md`
+- `agents/KIMI_NEXT_TASK_BENCHMARKS.md`
+
 ## 当前目标
 
 先交付 MVP：

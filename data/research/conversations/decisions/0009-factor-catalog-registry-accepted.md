@@ -1,4 +1,22 @@
-# 0009 Factor Catalog / Registry Accepted
+# 0009 因子目录与 Registry 采纳裁决
+
+## 文件用途
+
+这是 Codex 的项目裁决记录，不是给 Kimi 或 Qoder 的提示词。
+
+它放在 `data/research/conversations/decisions/`，表示这是一条进入项目长期记忆的架构决策：
+
+- 记录 Kimi 的因子目录压缩结果是否采纳。
+- 记录 Qoder 的 registry 规格是否采纳。
+- 固定下一步实现时必须遵守的边界。
+- 防止后续 Agent 忘记已经裁决过的命名、准入和实现范围。
+
+对应关系：
+
+- Kimi 交付：`data/research/conversations/agent-runs/2026-06-06-kimi-factor-catalog-curation.md`
+- Qoder 交付：`agents/SOURCE_FACTOR_REGISTRY_CODE_SPEC.md`
+- 下一步 Kimi 提示词：`agents/KIMI_NEXT_TASK_F1_FACTOR_FORMULA_CONTRACTS.md`
+- 下一步 Qoder 提示词：`agents/QODER_NEXT_TASK_FACTOR_REGISTRY_IMPLEMENTATION_PATCH.md`
 
 ## 背景
 

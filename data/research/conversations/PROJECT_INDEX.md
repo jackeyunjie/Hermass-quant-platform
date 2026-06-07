@@ -12,7 +12,7 @@
 - [[decisions/0006-phase1-preview-metadata-design]]
 - [[decisions/0007-factor-library-expansion-direction]]
 - [[decisions/0008-broad-factor-source-evidence-governance]]
-- [[decisions/0009-factor-catalog-registry-accepted]]
+- [[decisions/0009-factor-catalog-registry-accepted]]：Codex 对 Kimi 因子目录和 Qoder Registry 规格的采纳裁决，不是提示词。
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
@@ -23,7 +23,11 @@
 - `docs/FACTOR_BLOCK_LIBRARY_DESIGN_PRINCIPLES.md`
 - `docs/FACTOR_SOURCE_TAXONOMY.md`
 - `data/research/conversations/agent-runs/2026-06-06-kimi-factor-catalog-curation.md`
+- `data/research/conversations/agent-runs/2026-06-06-kimi-factor-library-research.md`
+- `data/research/conversations/agent-runs/2026-06-06-kimi-f1-factor-formula-contracts.md`
 - `agents/SOURCE_FACTOR_REGISTRY_CODE_SPEC.md`
+- `hermass_platform/factors/`
+- `config/factors/`
 
 ## Next Agent Prompts
 

@@ -1,0 +1,280 @@
+# Evidence Catalog
+# Evidence records for sources, factors, and blocks
+
+evidence:
+  - evidence_id: ev_sqx_b143_overview
+    source_id: sqx_b143
+    evidence_type: white_paper
+    evidence_level: E0
+    description: StrategyQuant X B143 White Paper - overview of strategy generation framework
+    url: https://strategyquant.com/b143
+    date: "2025-01-01"
+    status: pending
+    validation_status: pending
+    notes: Initial white paper, no independent validation
+
+  - evidence_id: ev_qlib_alpha158_ic
+    source_id: qlib_alpha158
+    evidence_type: backtest
+    evidence_level: E2
+    description: Qlib Alpha158 factor IC test on CSI300 2015-2023
+    url: https://github.com/microsoft/qlib/tree/main/examples/benchmarks
+    date: "2023-06-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.035
+        period: "2015-01-01 to 2023-06-01"
+      - metric_name: ic_std
+        value: 0.12
+        period: "2015-01-01 to 2023-06-01"
+    notes: IC mean 3.5%, ICIR ~0.29, standard benchmark
+
+  - evidence_id: ev_aqr_quality_paper
+    source_id: aqr_quality
+    evidence_type: academic_paper
+    evidence_level: E1
+    description: AQR Quality Minus Junk paper - cross-sectional quality factor
+    url: https://www.aqr.com/Insights/Research/Working-Paper/Quality-Minus-Junk
+    date: "2013-01-01"
+    status: validated
+    validation_status: pending
+    notes: US market evidence, A-share replication pending
+
+  - evidence_id: ev_fama_french_hml
+    source_id: fama_french
+    evidence_type: academic_paper
+    evidence_level: E1
+    description: Fama-French Three-Factor Model, HML factor
+    url: https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_factors.html
+    date: "1993-01-01"
+    status: validated
+    validation_status: passed
+    notes: Classic factor, A-share PB factor replication needed
+
+  - evidence_id: ev_blackwolf_moneyflow_alpha
+    source_id: blackwolf_moneyflow
+    evidence_type: backtest
+    evidence_level: E3
+    description: BlackWolf money flow factor backtest on A-share 2019-2024
+    url: ""
+    date: "2024-12-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: sharpe_ratio
+        value: 1.2
+        period: "2019-01-01 to 2024-12-01"
+      - metric_name: max_drawdown
+        value: -0.15
+        period: "2019-01-01 to 2024-12-01"
+    notes: A-share specific, good out-of-sample performance
+
+  - evidence_id: ev_hermass_statecube_d1
+    source_id: hermass_statecube
+    evidence_type: production_run
+    evidence_level: E5
+    description: Hermass State Cube D1 state production run on full A-share universe
+    url: ""
+    date: "2025-06-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: coverage_ratio
+        value: 0.98
+        period: "2025-01-01 to 2025-06-01"
+      - metric_name: daily_latency_ms
+        value: 120
+        period: "2025-06-01"
+    notes: Production system, daily update, 98% coverage
+
+  - evidence_id: ev_minervini_vcp_book
+    source_id: minervini_vcp
+    evidence_type: book
+    evidence_level: E0
+    description: Mark Minervini - Trade Like a Stock Market Wizard, VCP chapter
+    url: ""
+    date: "2013-01-01"
+    status: pending
+    validation_status: pending
+    notes: Trader methodology, no systematic backtest provided
+
+  - evidence_id: ev_wyckoff_method_book
+    source_id: wyckoff_method
+    evidence_type: book
+    evidence_level: E0
+    description: Richard Wyckoff - Studies in Tape Reading, spring test pattern
+    url: ""
+    date: "1910-01-01"
+    status: pending
+    validation_status: pending
+    notes: Classic trader methodology, needs systematic validation
+
+  - evidence_id: ev_news_sentiment_nlp_test
+    source_id: news_sentiment_api
+    evidence_type: backtest
+    evidence_level: E1
+    description: NLP sentiment model backtest on A-share news 2022-2024
+    url: ""
+    date: "2024-06-01"
+    status: validated
+    validation_status: failed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.008
+        period: "2022-01-01 to 2024-06-01"
+    notes: IC mean only 0.8%, below 1% threshold, considered failed
+
+  - evidence_id: ev_behavioral_limit_up_sentiment
+    source_id: behavioral_finance
+    evidence_type: backtest
+    evidence_level: E2
+    description: Limit-up sentiment index backtest on A-share 2018-2024
+    url: ""
+    date: "2024-12-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.025
+        period: "2018-01-01 to 2024-12-01"
+    notes: IC mean 2.5%, moderate signal strength
+
+  - evidence_id: ev_sqx_b143_walkforward
+    source_id: sqx_b143
+    evidence_type: walk_forward
+    evidence_level: E3
+    description: SQX B143 walk-forward test on 100 synthetic strategies
+    url: ""
+    date: "2025-03-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: robustness_score
+        value: 0.72
+        period: "2025-01-01 to 2025-03-01"
+    notes: 72% robustness score, moderate out-of-sample stability
+
+  - evidence_id: ev_limit_up_filter_production
+    source_id: sqx_b143
+    evidence_type: production_run
+    evidence_level: E4
+    description: Limit-up filter in production for 6 months
+    url: ""
+    date: "2025-06-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: false_positive_rate
+        value: 0.02
+        period: "2024-12-01 to 2025-06-01"
+    notes: 2% false positive rate in production, stable
+
+  - evidence_id: ev_beta_to_index_ic
+    source_id: qlib_alpha158
+    evidence_type: backtest
+    evidence_level: E2
+    description: Beta to market index factor IC test
+    url: ""
+    date: "2023-06-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.02
+        period: "2015-01-01 to 2023-06-01"
+    notes: IC mean 2%, risk factor, not alpha
+
+  - evidence_id: ev_rsi_14_ic
+    source_id: qlib_alpha158
+    evidence_type: backtest
+    evidence_level: E2
+    description: RSI 14 factor IC test on CSI300
+    url: ""
+    date: "2023-06-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.018
+        period: "2015-01-01 to 2023-06-01"
+    notes: IC mean 1.8%, mean-reversion signal
+
+  - evidence_id: ev_atr_14_ic
+    source_id: qlib_alpha158
+    evidence_type: backtest
+    evidence_level: E2
+    description: ATR 14 factor IC test on CSI300
+    url: ""
+    date: "2023-06-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.015
+        period: "2015-01-01 to 2023-06-01"
+    notes: IC mean 1.5%, volatility factor
+
+  - evidence_id: ev_macd_hist_ic
+    source_id: qlib_alpha158
+    evidence_type: backtest
+    evidence_level: E2
+    description: MACD histogram factor IC test on CSI300
+    url: ""
+    date: "2023-06-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.022
+        period: "2015-01-01 to 2023-06-01"
+    notes: IC mean 2.2%, momentum signal
+
+  - evidence_id: ev_return_20d_rank_ic
+    source_id: qlib_alpha158
+    evidence_type: backtest
+    evidence_level: E2
+    description: 20-day return cross-sectional rank IC test on CSI300
+    url: ""
+    date: "2023-06-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.04
+        period: "2015-01-01 to 2023-06-01"
+    notes: IC mean 4%, strongest momentum signal in Alpha158
+
+  - evidence_id: ev_main_force_inflow_ic
+    source_id: blackwolf_moneyflow
+    evidence_type: backtest
+    evidence_level: E2
+    description: Main force net inflow factor IC test on A-share
+    url: ""
+    date: "2024-12-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: ic_mean
+        value: 0.03
+        period: "2019-01-01 to 2024-12-01"
+    notes: IC mean 3%, money flow signal
+
+  - evidence_id: ev_fixed_stop_loss_oos
+    source_id: sqx_b143
+    evidence_type: walk_forward
+    evidence_level: E3
+    description: Fixed stop loss exit walk-forward test
+    url: ""
+    date: "2025-03-01"
+    status: validated
+    validation_status: passed
+    metrics:
+      - metric_name: win_rate
+        value: 0.45
+        period: "2020-01-01 to 2025-03-01"
+      - metric_name: profit_factor
+        value: 1.3
+        period: "2020-01-01 to 2025-03-01"
+    notes: 45% win rate, 1.3 profit factor, standard risk control

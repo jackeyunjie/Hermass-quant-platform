@@ -1,0 +1,358 @@
+# Factor Catalog
+# Canonical source_type per decision 0009
+
+factors:
+  - factor_id: rsi_14
+    name: RSI 14
+    name_en: Relative Strength Index 14
+    category: technical_momentum
+    level: L1
+    frequency: D1
+    inputs:
+      - close
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+    output_type: numeric
+    window: 14
+    direction: neutral
+    normalization:
+      - none
+    neutralization: []
+    compute_engine: polars
+    preview_support: fully_supported
+    dsl_exposure: exposed
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - qlib_alpha158
+    evidence_level: E2
+    data_availability: available
+    future_leakage_risk: none
+    a_share_notes: Use closing price, no future leakage
+
+  - factor_id: atr_14
+    name: ATR 14
+    name_en: Average True Range 14
+    category: technical_volatility
+    level: L1
+    frequency: D1
+    inputs:
+      - high
+      - low
+      - close
+    required_tables:
+      - daily_bars
+    required_columns:
+      - high
+      - low
+      - close
+    output_type: numeric
+    window: 14
+    direction: neutral
+    normalization: []
+    neutralization: []
+    compute_engine: polars
+    preview_support: fully_supported
+    dsl_exposure: exposed
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - qlib_alpha158
+    evidence_level: E2
+    data_availability: available
+    future_leakage_risk: none
+    a_share_notes: Use daily high/low/close, no future leakage
+
+  - factor_id: macd_hist
+    name: MACD Histogram
+    name_en: MACD Histogram
+    category: technical_trend
+    level: L1
+    frequency: D1
+    inputs:
+      - close
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+    output_type: numeric
+    direction: neutral
+    normalization: []
+    neutralization: []
+    compute_engine: polars
+    preview_support: fully_supported
+    dsl_exposure: exposed
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - qlib_alpha158
+    evidence_level: E2
+    data_availability: available
+    future_leakage_risk: none
+    a_share_notes: Standard MACD using closing price
+
+  - factor_id: return_20d_rank
+    name: 20-Day Return Cross-Sectional Rank
+    name_en: 20-Day Return Cross-Sectional Rank
+    category: cross_sectional_momentum
+    level: L2
+    frequency: D1
+    inputs:
+      - close
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+      - symbol
+      - date
+    output_type: numeric
+    window: 20
+    direction: higher_better
+    normalization:
+      - rank_pct
+    neutralization:
+      - industry_optional
+    compute_engine: polars
+    preview_support: fully_supported
+    dsl_exposure: candidate
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - qlib_alpha158
+    evidence_level: E2
+    data_availability: available
+    future_leakage_risk: none
+    a_share_notes: Use closing price for return, group by trading day for cross-sectional rank
+
+  - factor_id: quality_roe_ttm
+    name: ROE TTM
+    name_en: Return on Equity TTM
+    category: fundamental_quality
+    level: L3
+    frequency: D1
+    inputs:
+      - net_profit_ttm
+      - equity
+      - announcement_date
+    required_tables:
+      - financial_statements
+      - daily_bars
+    required_columns:
+      - net_profit_ttm
+      - equity
+      - announcement_date
+    output_type: numeric
+    direction: higher_better
+    normalization:
+      - winsorize
+      - zscore
+    neutralization:
+      - industry_optional
+    compute_engine: polars
+    preview_support: partial
+    dsl_exposure: none
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - aqr_quality
+      - fundamental_data
+    evidence_level: E1
+    data_availability: available
+    future_leakage_risk: high
+    a_share_notes: Must use announcement_date alignment, never use fiscal_period_end or future leakage occurs
+
+  - factor_id: value_pb
+    name: Price-to-Book Ratio
+    name_en: Price-to-Book Ratio
+    category: fundamental_valuation
+    level: L3
+    frequency: D1
+    inputs:
+      - close
+      - book_value
+    required_tables:
+      - financial_statements
+      - daily_bars
+    required_columns:
+      - close
+      - book_value
+      - announcement_date
+    output_type: numeric
+    direction: lower_better
+    normalization:
+      - winsorize
+      - zscore
+    neutralization:
+      - industry_optional
+    compute_engine: polars
+    preview_support: partial
+    dsl_exposure: none
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - fama_french
+      - fundamental_data
+    evidence_level: E1
+    data_availability: available
+    future_leakage_risk: high
+    a_share_notes: Must use announcement_date alignment for book value
+
+  - factor_id: main_force_inflow
+    name: Main Force Net Inflow
+    name_en: Main Force Net Inflow
+    category: money_flow
+    level: L4
+    frequency: D1
+    inputs:
+      - main_force_inflow
+    required_tables:
+      - moneyflow_daily
+    required_columns:
+      - main_force_inflow
+    output_type: numeric
+    direction: higher_better
+    normalization:
+      - rank_pct
+    neutralization: []
+    compute_engine: polars
+    preview_support: fully_supported
+    dsl_exposure: candidate
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - blackwolf_moneyflow
+    evidence_level: E2
+    data_availability: available
+    future_leakage_risk: none
+    a_share_notes: BlackWolf money flow data, daily update
+
+  - factor_id: d1_state
+    name: D1 State
+    name_en: Daily State
+    category: state
+    level: L5
+    frequency: D1
+    inputs:
+      - open
+      - high
+      - low
+      - close
+      - volume
+    required_tables:
+      - daily_bars
+    required_columns:
+      - open
+      - high
+      - low
+      - close
+      - volume
+    output_type: categorical
+    direction: neutral
+    normalization: []
+    neutralization: []
+    compute_engine: polars
+    preview_support: fully_supported
+    dsl_exposure: exposed
+    status: production
+    version: "1.0.0"
+    source_refs:
+      - hermass_statecube
+    evidence_level: E3
+    data_availability: available
+    future_leakage_risk: none
+    a_share_notes: Hermass proprietary State Cube, computed from daily OHLCV
+
+  - factor_id: limit_up_sentiment
+    name: Limit-Up Sentiment Index
+    name_en: Limit-Up Sentiment Index
+    category: behavioral_sentiment
+    level: L2
+    frequency: D1
+    inputs:
+      - limit_up_count
+      - total_stocks
+    required_tables:
+      - market_daily
+    required_columns:
+      - limit_up_count
+      - total_stocks
+    output_type: numeric
+    direction: neutral
+    normalization:
+      - zscore
+    neutralization: []
+    compute_engine: polars
+    preview_support: fully_supported
+    dsl_exposure: candidate
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - behavioral_finance
+    evidence_level: E2
+    data_availability: available
+    future_leakage_risk: none
+    a_share_notes: Use daily limit-up count, computed after market close
+
+  - factor_id: news_sentiment_score
+    name: News Sentiment Score
+    name_en: News Sentiment Score
+    category: sentiment
+    level: L4
+    frequency: D1
+    inputs:
+      - news_text
+    required_tables:
+      - news_data
+    required_columns:
+      - news_text
+      - publish_time
+    output_type: numeric
+    direction: higher_better
+    normalization:
+      - zscore
+    neutralization: []
+    compute_engine: pandas
+    preview_support: partial
+    dsl_exposure: none
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - news_sentiment_api
+    evidence_level: E1
+    data_availability: partial
+    future_leakage_risk: low
+    a_share_notes: NLP model output, need to handle publish time and news deduplication
+
+  - factor_id: beta_to_index
+    name: Beta to Market Index
+    name_en: Beta to Market Index
+    category: cross_sectional_risk
+    level: L2
+    frequency: D1
+    inputs:
+      - close
+      - index_close
+    required_tables:
+      - daily_bars
+      - index_daily
+    required_columns:
+      - close
+      - index_close
+    output_type: numeric
+    window: 252
+    direction: neutral
+    normalization: []
+    neutralization: []
+    compute_engine: polars
+    preview_support: partial
+    dsl_exposure: none
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - qlib_alpha158
+    evidence_level: E2
+    data_availability: available
+    future_leakage_risk: none
+    a_share_notes: Rolling 252-day return regression against market index

@@ -1,0 +1,166 @@
+# Factor Source Catalog
+# Canonical source_type per decision 0009
+
+sources:
+  - source_id: sqx_b143
+    source_type: strategy_generator
+    name: StrategyQuant X Build 143
+    url_or_local_ref: https://strategyquant.com/doc/build-143-changelog
+    reliability: high
+    license_notes: Commercial software, reference block design only, no source code copied
+    applicable_markets:
+      - A_SHARE
+      - US_EQUITY
+      - FUTURES
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - signal_blocks
+      - entry_blocks
+      - exit_blocks
+      - robustness
+
+  - source_id: qlib_alpha158
+    source_type: open_quant_framework
+    name: Qlib Alpha158
+    url_or_local_ref: https://github.com/microsoft/qlib
+    reliability: high
+    license_notes: MIT License, free to reference implementation
+    applicable_markets:
+      - A_SHARE
+      - US_EQUITY
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - cross_sectional
+      - alpha_features
+
+  - source_id: aqr_quality
+    source_type: institutional_factor
+    name: AQR Quality Factor Research
+    url_or_local_ref: https://www.aqr.com/Insights/Research/Working-Paper/Quality-Minus-Junk
+    reliability: high
+    license_notes: Academic paper public, factor definition free to implement
+    applicable_markets:
+      - GLOBAL
+      - A_SHARE
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - quality
+      - style_factor
+
+  - source_id: fama_french
+    source_type: academic_literature
+    name: Fama-French Factor Models
+    url_or_local_ref: https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+    reliability: high
+    license_notes: Academic data public use, attribution required
+    applicable_markets:
+      - GLOBAL
+      - US_EQUITY
+      - A_SHARE
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - size
+      - value
+      - momentum
+      - profitability
+
+  - source_id: fundamental_data
+    source_type: fundamental_data
+    name: A-Share Financial Statement Data
+    url_or_local_ref: config/data/fundamental/README.md
+    reliability: medium
+    license_notes: Requires Tushare / iFinD / Wind data vendor authorization
+    applicable_markets:
+      - A_SHARE
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - valuation
+      - profitability
+      - growth
+
+  - source_id: news_sentiment_api
+    source_type: news_sentiment
+    name: News Announcement Sentiment Data
+    url_or_local_ref: internal/data/news_sentiment_pipeline.md
+    reliability: low
+    license_notes: NLP model output, structured extraction only, no direct trading advice
+    applicable_markets:
+      - A_SHARE
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - sentiment
+      - nlp
+
+  - source_id: blackwolf_moneyflow
+    source_type: money_flow
+    name: BlackWolf Money Flow Data
+    url_or_local_ref: internal/data/blackwolf/README.md
+    reliability: high
+    license_notes: Internal data, A-share daily main/large/medium/small order flow
+    applicable_markets:
+      - A_SHARE
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - money_flow
+      - a_share
+
+  - source_id: minervini_vcp
+    source_type: trader_methodology
+    name: Mark Minervini SEPA / VCP
+    url_or_local_ref: https://minervini.com/book-trade-like-a-stock-market-wizard
+    reliability: medium
+    license_notes: Trading methodology, use after decomposition into observable blocks
+    applicable_markets:
+      - US_EQUITY
+      - A_SHARE
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - trader_methodology
+      - vcp
+      - breakout
+
+  - source_id: behavioral_finance
+    source_type: behavioral_factor
+    name: Behavioral Finance Classic Research
+    url_or_local_ref: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1570484
+    reliability: medium
+    license_notes: Academic research public, must convert to observable proxy
+    applicable_markets:
+      - GLOBAL
+      - A_SHARE
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - overreaction
+      - momentum
+      - crowdedness
+
+  - source_id: hermass_statecube
+    source_type: hermass_native
+    name: Hermass State Cube
+    url_or_local_ref: internal/hermass/state_cube/README.md
+    reliability: high
+    license_notes: Hermass proprietary intellectual property
+    applicable_markets:
+      - A_SHARE
+      - ETF
+      - INDEX
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - state_cube
+      - multi_timeframe
+      - native
+
+  - source_id: wyckoff_method
+    source_type: trader_methodology
+    name: Wyckoff Method
+    url_or_local_ref: https://wyckoffanalytics.com/wyckoff-method/
+    reliability: medium
+    license_notes: Public trading methodology, decompose into observable blocks
+    applicable_markets:
+      - US_EQUITY
+      - A_SHARE
+    imported_at: "2026-06-06T00:00:00Z"
+    tags:
+      - wyckoff
+      - accumulation
+      - distribution

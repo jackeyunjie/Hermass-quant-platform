@@ -229,6 +229,11 @@
 任务文件：
 - `agents/KIMI_NEXT_TASK_FACTOR_LIBRARY_RESEARCH.md`
 
+状态更新：
+- Kimi 已完成，文件：`data/research/conversations/agent-runs/2026-06-06-kimi-factor-library-research.md`。
+- 输出：55 个候选因子，Tier 1 MVP+ Ready 20 个、Tier 2 High Value Next 20 个、Tier 3 Research Backlog 15 个。
+- Codex 采纳为早期高配因子库研究资产；后续以更严格的 F1 30 条目录和 registry gate 为工程落地准绳。
+
 ### K7: StrategyQuant X B143 Block 研究
 
 交付：
@@ -430,6 +435,13 @@
 - registry 测试覆盖 canonical source_type、evidence gate、future leakage gate、data availability gate、source_refs 校验。
 
 状态：已完成派工。
+
+状态更新：
+- Kimi 已完成 F1 公式和数据契约，文件：`data/research/conversations/agent-runs/2026-06-06-kimi-f1-factor-formula-contracts.md`。
+- Qoder 已实现 `hermass_platform/factors/` registry、`config/factors/*.yaml` catalogs 和测试。
+- Codex 复核并修正 `EvidenceRegistry` 重复 evidence 异常类型，新增 `DuplicateEvidenceError`。
+- 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/factors/tests -q`，57 passed。
+- 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m py_compile hermass_platform/factors/*.py`，通过。
 
 ### C3: Phase 1 API 与预览
 

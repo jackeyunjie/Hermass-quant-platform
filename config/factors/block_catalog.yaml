@@ -1,0 +1,602 @@
+# Block Catalog
+# Canonical source_type per decision 0009
+
+blocks:
+  - block_id: signal_indicator_cross_threshold
+    block_type: signal
+    name: Indicator Cross Above Threshold
+    name_en: Indicator Cross Above Threshold
+    description: Trigger signal when any numeric factor crosses above threshold
+    input_factor_types:
+      - numeric
+    parameters:
+      factor_id:
+        name: factor_id
+        param_type: factor_ref
+        description: Referenced factor ID
+        required: true
+        factor_scope:
+          - technical
+          - state
+          - money_flow
+      operator:
+        name: operator
+        param_type: enum
+        description: Comparison operator
+        required: true
+        enum_values:
+          - cross_up
+          - cross_down
+          - ">"
+          - "<"
+          - ">="
+          - "<="
+      threshold:
+        name: threshold
+        param_type: float
+        description: Threshold value
+        required: true
+        range_min: -10.0
+        range_max: 10.0
+    parameter_space:
+      threshold:
+        mode: range
+        min: -2.0
+        max: 2.0
+        step: 0.1
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns: []
+    required_context:
+      - none
+    preview_support: fully_supported
+    dsl_output: factor_threshold
+    robustness_role: signal_timing
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+      - ETF
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - sqx_b143
+    evidence_level: E2
+    generation_weight: 1.0
+    production_gate: candidate
+
+  - block_id: signal_factor_cross
+    block_type: signal
+    name: Factor Golden Cross
+    name_en: Factor Golden Cross
+    description: Trigger when factor_a crosses above factor_b
+    input_factor_types:
+      - numeric
+    parameters:
+      factor_a:
+        name: factor_a
+        param_type: factor_ref
+        required: true
+      factor_b:
+        name: factor_b
+        param_type: factor_ref
+        required: true
+    parameter_space: {}
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_context:
+      - none
+    preview_support: fully_supported
+    dsl_output: factor_cross
+    market_scope:
+      - A_SHARE
+      - ETF
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - sqx_b143
+    evidence_level: E2
+    generation_weight: 1.0
+    production_gate: candidate
+
+  - block_id: entry_breakout
+    block_type: entry
+    name: Breakout Entry
+    name_en: Breakout Entry
+    description: Enter when price breaks N-day high with volume expansion
+    input_factor_types:
+      - numeric
+      - boolean
+    input_factor_refs:
+      - close
+      - high
+      - volume
+    parameters:
+      lookback:
+        name: lookback
+        param_type: integer
+        description: Lookback period
+        required: true
+        range_min: 5
+        range_max: 60
+        default: 20
+      volume_multiplier:
+        name: volume_multiplier
+        param_type: float
+        description: Volume multiplier
+        required: true
+        range_min: 1.0
+        range_max: 3.0
+        default: 1.5
+    parameter_space:
+      lookback:
+        mode: range
+        min: 10
+        max: 60
+        step: 5
+      volume_multiplier:
+        mode: range
+        min: 1.0
+        max: 3.0
+        step: 0.25
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+      - high
+      - volume
+    required_context:
+      - none
+    preview_support: fully_supported
+    dsl_output: block_entry
+    robustness_role: entry_timing
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+    status: candidate
+    version: "0.1.0"
+    source_refs:
+      - sqx_b143
+      - minervini_vcp
+    methodology_refs:
+      - minervini_vcp
+    evidence_level: E1
+    generation_weight: 0.8
+    production_gate: blocked
+
+  - block_id: exit_fixed_stop_loss
+    block_type: exit
+    name: Fixed Stop Loss Exit
+    name_en: Fixed Stop Loss Exit
+    description: Exit when price falls below entry price by fixed percentage
+    input_factor_types:
+      - numeric
+    parameters:
+      stop_pct:
+        name: stop_pct
+        param_type: float
+        description: Stop loss percentage
+        required: true
+        range_min: 0.01
+        range_max: 0.5
+        default: 0.08
+    parameter_space:
+      stop_pct:
+        mode: range
+        min: 0.05
+        max: 0.15
+        step: 0.01
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+    required_context:
+      - backtest
+    preview_support: partial
+    dsl_output: block_exit
+    robustness_role: risk_control
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+      - ETF
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - sqx_b143
+    evidence_level: E2
+    generation_weight: 1.0
+    production_gate: candidate
+
+  - block_id: exit_atr_trailing_stop
+    block_type: exit
+    name: ATR Trailing Stop
+    name_en: ATR Trailing Stop
+    description: Trailing stop based on ATR
+    input_factor_types:
+      - numeric
+    input_factor_refs:
+      - atr_14
+    parameters:
+      atr_multiplier:
+        name: atr_multiplier
+        param_type: float
+        description: ATR multiplier
+        required: true
+        range_min: 1.0
+        range_max: 5.0
+        default: 2.0
+    parameter_space:
+      atr_multiplier:
+        mode: range
+        min: 1.5
+        max: 3.5
+        step: 0.25
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+      - high
+      - low
+    required_context:
+      - backtest
+      - position
+    preview_support: partial
+    dsl_output: block_exit
+    robustness_role: risk_control
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+    status: candidate
+    version: "0.1.0"
+    source_refs:
+      - sqx_b143
+    evidence_level: E2
+    generation_weight: 0.9
+    production_gate: candidate
+
+  - block_id: order_market
+    block_type: order
+    name: Market Order
+    name_en: Market Order
+    description: Execute at next bar open price
+    input_factor_types: []
+    parameters:
+      slippage_pct:
+        name: slippage_pct
+        param_type: float
+        description: Slippage percentage
+        required: true
+        range_min: 0.0
+        range_max: 0.01
+        default: 0.001
+    parameter_space:
+      slippage_pct:
+        mode: range
+        min: 0.0
+        max: 0.005
+        step: 0.0005
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns:
+      - open
+    required_context:
+      - backtest
+    preview_support: not_supported
+    dsl_output: block_order
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+      - ETF
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - sqx_b143
+    evidence_level: E2
+    generation_weight: 1.0
+    production_gate: candidate
+
+  - block_id: filter_limit_up
+    block_type: filter
+    name: Limit-Up Filter
+    name_en: Limit-Up Filter
+    description: Filter stocks that hit limit-up and cannot be bought
+    input_factor_types:
+      - boolean
+    parameters: {}
+    parameter_space: {}
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+      - limit_up_price
+    required_context:
+      - none
+    preview_support: fully_supported
+    dsl_output: block_filter
+    market_scope:
+      - A_SHARE
+    status: production
+    version: "1.0.0"
+    source_refs:
+      - sqx_b143
+      - hermass_statecube
+    evidence_level: E4
+    generation_weight: 1.0
+    production_gate: approved
+
+  - block_id: filter_liquidity
+    block_type: filter
+    name: Liquidity Filter
+    name_en: Liquidity Filter
+    description: Filter stocks with turnover amount below threshold
+    input_factor_types:
+      - numeric
+    parameters:
+      min_amount:
+        name: min_amount
+        param_type: float
+        description: Minimum turnover amount (10k CNY)
+        required: true
+        range_min: 100
+        range_max: 10000
+        default: 1000
+    parameter_space:
+      min_amount:
+        mode: range
+        min: 500
+        max: 5000
+        step: 500
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns:
+      - amount
+    required_context:
+      - none
+    preview_support: fully_supported
+    dsl_output: block_filter
+    market_scope:
+      - A_SHARE
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - blackwolf_moneyflow
+    evidence_level: E2
+    generation_weight: 1.0
+    production_gate: candidate
+
+  - block_id: sizing_fixed_pct
+    block_type: money_management
+    name: Fixed Percentage Sizing
+    name_en: Fixed Percentage Sizing
+    description: Use fixed percentage of account per trade
+    input_factor_types:
+      - numeric
+    parameters:
+      pct:
+        name: pct
+        param_type: float
+        description: Position percentage
+        required: true
+        range_min: 0.01
+        range_max: 1.0
+        default: 0.2
+    parameter_space:
+      pct:
+        mode: range
+        min: 0.05
+        max: 0.25
+        step: 0.05
+    weight: 1.0
+    enabled: true
+    required_tables: []
+    required_columns: []
+    required_context:
+      - portfolio
+    preview_support: not_supported
+    dsl_output: block_sizing
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+    status: validated
+    version: "0.1.0"
+    source_refs:
+      - sqx_b143
+    evidence_level: E2
+    generation_weight: 1.0
+    production_gate: candidate
+
+  - block_id: robustness_walk_forward
+    block_type: robustness
+    name: Walk-Forward Robustness
+    name_en: Walk-Forward Robustness
+    description: Rolling in-sample/out-of-sample test over time series
+    input_factor_types:
+      - numeric
+    parameters:
+      train_pct:
+        name: train_pct
+        param_type: float
+        description: Training set percentage
+        required: true
+        range_min: 0.5
+        range_max: 0.8
+        default: 0.7
+      windows:
+        name: windows
+        param_type: integer
+        description: Number of rolling windows
+        required: true
+        range_min: 3
+        range_max: 10
+        default: 5
+    parameter_space:
+      train_pct:
+        mode: range
+        min: 0.6
+        max: 0.8
+        step: 0.05
+      windows:
+        mode: range
+        min: 3
+        max: 6
+        step: 1
+    weight: 1.0
+    enabled: false
+    required_tables: []
+    required_columns: []
+    required_context:
+      - backtest
+    preview_support: not_supported
+    dsl_output: block_robustness
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - sqx_b143
+    evidence_level: E3
+    generation_weight: 0.5
+    production_gate: blocked
+    robustness_tests: []
+
+  - block_id: vcp_contraction_detector
+    block_type: signal
+    name: VCP Contraction Detector
+    name_en: VCP Contraction Detector
+    description: Detect volatility contraction pattern for Minervini VCP strategy
+    input_factor_types:
+      - numeric
+    input_factor_refs:
+      - atr_14
+      - close
+      - volume
+    parameters:
+      contraction_periods:
+        name: contraction_periods
+        param_type: integer
+        description: Number of contraction phases (2-4)
+        required: true
+        range_min: 2
+        range_max: 4
+        default: 3
+      volume_dry_up_pct:
+        name: volume_dry_up_pct
+        param_type: float
+        description: Volume dry-up percentage
+        required: true
+        range_min: 0.3
+        range_max: 0.8
+        default: 0.5
+    parameter_space:
+      contraction_periods:
+        mode: range
+        min: 2
+        max: 4
+        step: 1
+      volume_dry_up_pct:
+        mode: range
+        min: 0.4
+        max: 0.7
+        step: 0.1
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+      - volume
+      - high
+      - low
+    required_context:
+      - none
+    preview_support: partial
+    dsl_output: block_signal
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - minervini_vcp
+      - sqx_b143
+    methodology_refs:
+      - minervini_vcp
+    evidence_level: E1
+    generation_weight: 0.7
+    production_gate: blocked
+
+  - block_id: wyckoff_spring_test
+    block_type: signal
+    name: Wyckoff Spring Test
+    name_en: Wyckoff Spring Test
+    description: Price briefly breaks support then quickly recovers, identifying accumulation spring
+    input_factor_types:
+      - numeric
+    parameters:
+      support_lookback:
+        name: support_lookback
+        param_type: integer
+        description: Support line lookback period
+        required: true
+        range_min: 10
+        range_max: 60
+        default: 20
+      retrace_pct:
+        name: retrace_pct
+        param_type: float
+        description: Max percentage below support
+        required: true
+        range_min: 0.01
+        range_max: 0.05
+        default: 0.03
+    parameter_space:
+      support_lookback:
+        mode: range
+        min: 20
+        max: 40
+        step: 5
+      retrace_pct:
+        mode: range
+        min: 0.02
+        max: 0.04
+        step: 0.005
+    weight: 1.0
+    enabled: true
+    required_tables:
+      - daily_bars
+    required_columns:
+      - close
+      - low
+      - volume
+    required_context:
+      - none
+    preview_support: partial
+    dsl_output: block_signal
+    market_scope:
+      - A_SHARE
+      - US_EQUITY
+    status: research
+    version: "0.1.0"
+    source_refs:
+      - wyckoff_method
+    methodology_refs:
+      - wyckoff
+    evidence_level: E1
+    generation_weight: 0.6
+    production_gate: blocked

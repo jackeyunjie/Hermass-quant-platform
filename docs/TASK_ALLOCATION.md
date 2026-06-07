@@ -7,6 +7,7 @@
 新增战略目标：
 - 扩展高配因子库，但先做 Factor Registry 和评估闭环，不直接堆未验证因子。
 - 因子/Block 库设计原则：重点清晰、准备完备、架构灵活。
+- 因子来源必须广泛覆盖成熟项目、机构研究、基本面、消息面、心理面、资金流、订单流和交易方法论，并通过 evidence level 管理。
 
 ## Qoder 任务
 
@@ -241,6 +242,19 @@
 任务文件：
 - `agents/KIMI_NEXT_TASK_STRATEGYQUANT_FACTOR_BLOCKS_RESEARCH.md`
 
+### K8: 广义因子来源研究
+
+交付：
+- 200+ factor/block 候选。
+- 来源图谱。
+- 交易方法论拆解。
+- 数据缺口。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_BROAD_FACTOR_SOURCE_RESEARCH.md`
+
 ## Codex 任务
 
 ### C1: 项目协作资产
@@ -356,6 +370,19 @@
 - 明确重点清晰、准备完备、架构灵活。
 - 明确 F0/F1/F2 落地顺序。
 - 明确不盲目复制 SQX 548 blocks。
+
+状态：已完成。
+
+### C11: 广义因子来源治理
+
+交付：
+- `docs/FACTOR_SOURCE_TAXONOMY.md`
+- `agents/KIMI_NEXT_TASK_BROAD_FACTOR_SOURCE_RESEARCH.md`
+- `agents/QODER_NEXT_TASK_FACTOR_SOURCE_SCHEMA.md`
+
+验收：
+- 因子来源分类进入项目资产。
+- evidence level 进入后续 schema 设计。
 
 状态：已完成。
 

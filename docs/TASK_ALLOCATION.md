@@ -84,6 +84,11 @@
 下一轮任务：
 - `agents/QODER_NEXT_TASK_PHASE1_IMPLEMENTATION_PATCH.md`
 
+状态更新：
+- Qoder 已完成 patch spec，文件：`agents/PHASE1_IMPLEMENTATION_PATCH_SPEC.md`。
+- Codex 采纳 `preview_support/context_requirements` 作为 Phase 1 实现基础。
+- Phase 1 实现下一步可启动。
+
 ## Kimi 任务
 
 ### K1: Light Backtest 性能基准
@@ -190,6 +195,11 @@
 
 下一轮任务：
 - `agents/KIMI_NEXT_TASK_REAL_DATA_BENCHMARK_RUNBOOK.md`
+
+状态更新：
+- Kimi 已完成 runbook，文件：`data/research/conversations/agent-runs/2026-06-06-kimi-real-data-benchmark-runbook.md`。
+- Codex 采纳 Hot Path Gates 作为 Phase 2 性能验收基线。
+- 后续需实现 `benchmarks/validate_real_data.py`，并改进 benchmark 分阶段计时、`--symbols/--days/--runs` 参数。
 
 ## Codex 任务
 

@@ -8,6 +8,8 @@
 - [[decisions/0002-kimi-performance-data-architecture]]
 - [[decisions/0003-qoder-phase-0-accepted-with-followups]]
 - [[decisions/0004-phase1-preview-stop-loss-context]]
+- [[decisions/0005-phase2-hot-path-gates]]
+- [[decisions/0006-phase1-preview-metadata-design]]
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]

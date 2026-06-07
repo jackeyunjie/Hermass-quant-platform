@@ -59,6 +59,23 @@
 - 条件 metadata 需要区分数据依赖和执行上下文依赖。
 - `stop_loss_pct` 属于 backtest/position context，不等于 Phase 1 blocked condition。
 
+## 2026-06-06 Kimi Real Data Runbook 后的 Skill 更新点
+
+`hermass-backtest-mvp` 后续应加入：
+
+- 真实数据 benchmark 前必须先跑 `validate_real_data.py`。
+- Phase 2 hot path gates：5000×252 P95 < 30s，load < 10s，signal < 12s，metrics < 8s，峰值内存 < 4GB。
+- 热路径禁止 pandas 中间转换、`SELECT *`、`iterrows`、`apply(lambda row`、Python 分组循环、`eval/exec`。
+
+## 2026-06-06 Qoder Patch Spec 后的 Skill 更新点
+
+`hermass-dsl-builder` 后续应加入：
+
+- `preview_support` 是 Preview 路由权威。
+- `required_tables` 只描述静态数据依赖，不用于简单 blocklist。
+- `context_requirements` 描述 position/portfolio/market_state 等运行时上下文。
+- `requires_backtest_context` 不等于失败；只在 condition/section 级标记。
+
 ## 待拆分 Skill
 
 - `hermass-dsl-builder`

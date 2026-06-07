@@ -260,6 +260,9 @@
 - 候选数：278 条 factor/block。
 - Codex 裁决：进入 research catalog，不直接进入 production DSL。
 
+下一轮任务：
+- `agents/KIMI_NEXT_TASK_FACTOR_CATALOG_CURATION.md`
+
 ## Codex 任务
 
 ### C1: 项目协作资产
@@ -394,6 +397,19 @@
 状态更新：
 - Qoder 已完成 source/evidence schema，文件：`agents/FACTOR_SOURCE_SCHEMA.md`。
 - Codex 已新增决策 `0008-broad-factor-source-evidence-governance.md`。
+
+### C12: Factor Catalog / Registry 派工
+
+交付：
+- `agents/KIMI_NEXT_TASK_FACTOR_CATALOG_CURATION.md`
+- `agents/QODER_NEXT_TASK_SOURCE_FACTOR_REGISTRY_CODE.md`
+
+验收：
+- Kimi 把 278 个广义候选压缩为 F0 source catalog、F1 30 个 MVP+ 条目、F2 70 个候选条目。
+- Qoder 输出 Source/Evidence/Factor/Block registry 代码规格，明确 schema、registry API、YAML catalog 和测试计划。
+- evidence gate、future leakage gate、data availability gate 明确进入工程规则。
+
+状态：已完成。
 
 ### C3: Phase 1 API 与预览
 

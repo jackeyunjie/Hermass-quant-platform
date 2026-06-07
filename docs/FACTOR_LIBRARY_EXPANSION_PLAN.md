@@ -51,6 +51,24 @@
 - 每个候选因子必须跑：IC/RankIC、分层收益、多空收益、换手、覆盖率、缺失率、成本后收益、市场状态分层。
 - 未通过评估的因子不能进入生产 DSL。
 
+### StrategyQuant X / Build 143
+
+借鉴点：
+
+- StrategyQuant X 的核心是 building blocks，不只是指标列表。
+- Building blocks 包含 signals、indicators、stop/limit entry blocks、order types、exit types、custom data indicators。
+- 每个 block 有启用开关、权重、参数范围、参数集和校准。
+- B143 引入 AI 生成策略、AlgoWizard 重写、StockPicker / Single Asset 新稳健性测试，以及更真实的 limit fill / limit over 行为。
+- SQX 的可扩展点是 snippets / custom indicators / custom signals，而不是硬编码单一策略模板。
+
+落地到 Hermass：
+
+- 因子库升级为 `Factor + Block Library`。
+- 不只管理指标，还管理信号块、入场块、退出块、订单块、过滤块、稳健性测试块。
+- 每个 block 必须声明参数搜索空间、权重、适用市场、数据依赖、preview 支持、回测上下文需求和稳健性测试要求。
+- AI 可以生成策略，但只能组合已注册 block，不能生成可执行代码。
+- 生成策略后必须经过 Preview、Backtest、Walk-forward、Robustness、Factor Evaluation，再允许进入候选库。
+
 ## 当前状态
 
 当前只有 MVP 条件库：
@@ -250,6 +268,72 @@ Industry Chain：
 - 产业链共振。
 - 行业扩散强度。
 
+### L6 Strategy Building Blocks
+
+借鉴 StrategyQuant X，将策略构造块分为：
+
+Signals：
+
+- indicator crossed above/below threshold。
+- indicator crossed another indicator。
+- indicator rising/falling。
+- price breakout / breakdown。
+- volatility contraction / expansion。
+- trend regime confirmation。
+- multi-timeframe agreement。
+
+Indicators：
+
+- 所有 L1-L5 因子都可以作为 indicator source。
+- 支持 price value、range value、spread value、state value。
+
+Entry Blocks：
+
+- market entry。
+- stop entry。
+- limit entry。
+- pullback entry。
+- breakout entry。
+- reverse entry。
+- time/session constrained entry。
+
+Exit Blocks：
+
+- fixed stop loss。
+- fixed take profit。
+- ATR trailing stop。
+- Chandelier exit。
+- indicator exit。
+- time-based exit。
+- volatility exit。
+- regime invalidation exit。
+- partial exit。
+
+Order / Execution Blocks：
+
+- market。
+- limit。
+- stop。
+- stop-limit。
+- better limit fill model。
+- limit over / under realistic fill model。
+- slippage / commission / tax model。
+
+Robustness Blocks：
+
+- walk-forward。
+- parameter jitter。
+- random trade skip。
+- random execution degradation。
+- spread/slippage stress。
+- market regime split。
+- symbol split。
+- date split。
+- state split。
+- Monte Carlo equity perturbation。
+
+这些 block 不等于全部立刻实现。F0 只做 metadata 和 catalog。
+
 ## Factor Metadata Schema
 
 每个因子必须声明：
@@ -276,6 +360,34 @@ Industry Chain：
 }
 ```
 
+## Block Metadata Schema
+
+为了支持 StrategyQuant X 风格生成器，需要 block 级 metadata：
+
+```json
+{
+  "block_id": "signal_indicator_cross_threshold",
+  "block_type": "signal",
+  "name": "指标上穿阈值",
+  "input_factor_types": ["numeric"],
+  "parameters": {
+    "factor_id": {"type": "factor_ref", "scope": ["technical", "state", "money_flow"]},
+    "operator": {"type": "enum", "values": ["cross_up", "cross_down", ">", "<", ">=", "<="]},
+    "threshold": {"type": "number", "range": [-10, 10]}
+  },
+  "parameter_space": {
+    "factor_id": {"mode": "choice"},
+    "threshold": {"mode": "range", "min": -2, "max": 2, "step": 0.1}
+  },
+  "weight": 1.0,
+  "enabled": true,
+  "required_context": [],
+  "preview_support": "fully_supported",
+  "dsl_output": "factor_threshold",
+  "status": "research"
+}
+```
+
 ## DSL 接入策略
 
 不要为每个因子创建一个条件类型。优先创建通用 DSL 条件：
@@ -287,6 +399,9 @@ Industry Chain：
 - `factor_trend`
 - `factor_regime_filter`
 - `factor_composite_score`
+- `block_signal`
+- `block_exit`
+- `block_order`
 
 示例：
 
@@ -315,21 +430,34 @@ Industry Chain：
 - 没有明显未来函数。
 - 通过 data freshness 与 survivorship bias 检查。
 
+策略 block 进入生成器前还必须满足：
+
+- 参数空间有边界，不能无限搜索。
+- 默认权重和启用状态有依据。
+- 至少有一个 smoke backtest。
+- 至少通过一次 robustness smoke。
+- 明确适用市场：A 股日频、A 股分钟、指数、ETF、期货等。
+- 明确是否需要持仓、订单、组合上下文。
+
 ## 分阶段实施
 
 ### Phase F0: Factor Registry
 
 目标：
 
-- 建立因子元数据注册表。
+- 建立因子元数据注册表和 block 元数据注册表。
 - 不急着计算所有因子。
 
 交付：
 
 - `hermass_platform/factors/factor_registry.py`
 - `hermass_platform/factors/factor_schema.py`
+- `hermass_platform/factors/block_registry.py`
+- `hermass_platform/factors/block_schema.py`
 - `config/factors/factor_catalog.yaml`
+- `config/factors/block_catalog.yaml`
 - 因子 metadata 测试。
+- block metadata 测试。
 
 ### Phase F1: Technical MVP+
 
@@ -368,6 +496,17 @@ Industry Chain：
 - State 分层表现。
 - HTML/Markdown factor report。
 
+### Phase F3.5: StrategyQuant-Style Generator
+
+新增：
+
+- block 权重。
+- 参数空间。
+- block 组合约束。
+- genetic/random/AI prompt strategy generation。
+- robustness smoke pipeline。
+- strategy candidate databank。
+
 ### Phase F4: Money Flow / Fundamental
 
 在数据源稳定后接入：
@@ -389,6 +528,8 @@ Qoder：
 
 - Factor metadata schema。
 - Factor registry。
+- Block metadata schema。
+- Block registry。
 - DSL 通用条件设计。
 - API/Preview 接入。
 

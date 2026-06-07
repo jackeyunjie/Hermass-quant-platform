@@ -227,6 +227,19 @@
 任务文件：
 - `agents/KIMI_NEXT_TASK_FACTOR_LIBRARY_RESEARCH.md`
 
+### K7: StrategyQuant X B143 Block 研究
+
+交付：
+- 120+ 候选 block。
+- Factor vs Block 边界。
+- A 股适配风险。
+- 高配优先级。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_STRATEGYQUANT_FACTOR_BLOCKS_RESEARCH.md`
+
 ## Codex 任务
 
 ### C1: 项目协作资产
@@ -317,6 +330,19 @@
 验收：
 - 高配因子库方向进入项目决策。
 - Kimi/Qoder 有明确下一步。
+
+状态：已完成。
+
+### C9: StrategyQuant X B143 参考模型派工
+
+交付：
+- `docs/STRATEGYQUANT_XB143_REFERENCE_MODEL.md`
+- `agents/KIMI_NEXT_TASK_STRATEGYQUANT_FACTOR_BLOCKS_RESEARCH.md`
+- `agents/QODER_NEXT_TASK_BLOCK_LIBRARY_ARCHITECTURE.md`
+
+验收：
+- StrategyQuant X B143 的 building-block 思路进入项目资产。
+- 因子库升级为 Factor + Block Library。
 
 状态：已完成。
 

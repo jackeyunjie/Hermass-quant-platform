@@ -411,6 +411,26 @@
 
 状态：已完成。
 
+状态更新：
+- Kimi 已完成目录压缩，文件：`data/research/conversations/agent-runs/2026-06-06-kimi-factor-catalog-curation.md`。
+- 结果：F0 12 sources、F1 30 items、F2 70 items、Research Backlog 178 items。
+- Qoder 已完成 registry 代码规格，文件：`agents/SOURCE_FACTOR_REGISTRY_CODE_SPEC.md`。
+- Codex 裁决：采纳，但实现时 `source_type` 必须以 `agents/FACTOR_SOURCE_SCHEMA.md` 为 canonical，修正 Qoder spec 中的命名漂移。
+
+### C13: Factor Formula / Registry Implementation 派工
+
+交付：
+- `agents/KIMI_NEXT_TASK_F1_FACTOR_FORMULA_CONTRACTS.md`
+- `agents/QODER_NEXT_TASK_FACTOR_REGISTRY_IMPLEMENTATION_PATCH.md`
+- `data/research/conversations/decisions/0009-factor-catalog-registry-accepted.md`
+
+验收：
+- Kimi 输出 F1 26 个 factor 的公式、输入列、输出列、Polars/DuckDB hint、预计算优先级。
+- Qoder 实现 `hermass_platform/factors/` registry 第一版代码和 YAML catalogs。
+- registry 测试覆盖 canonical source_type、evidence gate、future leakage gate、data availability gate、source_refs 校验。
+
+状态：已完成派工。
+
 ### C3: Phase 1 API 与预览
 
 交付：

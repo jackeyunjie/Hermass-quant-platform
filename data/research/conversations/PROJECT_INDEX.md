@@ -12,6 +12,7 @@
 - [[decisions/0006-phase1-preview-metadata-design]]
 - [[decisions/0007-factor-library-expansion-direction]]
 - [[decisions/0008-broad-factor-source-evidence-governance]]
+- [[decisions/0009-factor-catalog-registry-accepted]]
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
@@ -21,6 +22,8 @@
 - `docs/SQX_LOCAL_BLOCK_INVENTORY.md`
 - `docs/FACTOR_BLOCK_LIBRARY_DESIGN_PRINCIPLES.md`
 - `docs/FACTOR_SOURCE_TAXONOMY.md`
+- `data/research/conversations/agent-runs/2026-06-06-kimi-factor-catalog-curation.md`
+- `agents/SOURCE_FACTOR_REGISTRY_CODE_SPEC.md`
 
 ## Next Agent Prompts
 
@@ -36,6 +39,8 @@
 - `agents/QODER_NEXT_TASK_BLOCK_LIBRARY_ARCHITECTURE.md`
 - `agents/KIMI_NEXT_TASK_FACTOR_CATALOG_CURATION.md`
 - `agents/QODER_NEXT_TASK_SOURCE_FACTOR_REGISTRY_CODE.md`
+- `agents/KIMI_NEXT_TASK_F1_FACTOR_FORMULA_CONTRACTS.md`
+- `agents/QODER_NEXT_TASK_FACTOR_REGISTRY_IMPLEMENTATION_PATCH.md`
 
 ## 当前目标
 

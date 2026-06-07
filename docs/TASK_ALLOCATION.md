@@ -89,6 +89,9 @@
 - Codex 采纳 `preview_support/context_requirements` 作为 Phase 1 实现基础。
 - Phase 1 实现下一步可启动。
 
+下一轮任务 2：
+- `agents/QODER_NEXT_TASK_PHASE1_CODE_PATCH.md`
+
 ## Kimi 任务
 
 ### K1: Light Backtest 性能基准
@@ -201,6 +204,9 @@
 - Codex 采纳 Hot Path Gates 作为 Phase 2 性能验收基线。
 - 后续需实现 `benchmarks/validate_real_data.py`，并改进 benchmark 分阶段计时、`--symbols/--days/--runs` 参数。
 
+下一轮任务 2：
+- `agents/KIMI_NEXT_TASK_VALIDATE_AND_BENCHMARK_PATCH.md`
+
 ## Codex 任务
 
 ### C1: 项目协作资产
@@ -265,6 +271,18 @@
 验收：
 - Qoder 任务明确要求修正 stop loss preview context。
 - Kimi 任务明确要求真实数据 runbook 和 Phase 2 hot path gates。
+
+状态：已完成。
+
+### C7: 下一轮 Agent 派工 3
+
+交付：
+- `agents/QODER_NEXT_TASK_PHASE1_CODE_PATCH.md`
+- `agents/KIMI_NEXT_TASK_VALIDATE_AND_BENCHMARK_PATCH.md`
+
+验收：
+- Qoder 任务要求直接实现 Phase 1 metadata/api_models/preview_service 第一批代码。
+- Kimi 任务要求直接实现 `validate_real_data.py` 和 benchmark CLI/分阶段计时改进。
 
 状态：已完成。
 

@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Runtime outputs
+outputs/
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Obsidian local workspace state
+data/research/conversations/.obsidian/workspace*.json
+data/research/conversations/daily/
+data/research/conversations/web-clips/

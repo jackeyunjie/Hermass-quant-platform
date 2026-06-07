@@ -1,0 +1,542 @@
+"""Condition Registry - Type-safe registration and validation of strategy conditions.
+
+All condition types must be registered before use. The registry enforces:
+    - Parameter schema validation (JSON Schema subset)
+    - Category classification (entry, exit, filter)
+    - Translator dialect support (duckdb, polars, both)
+
+Usage:
+    registry = ConditionRegistry.default()
+    spec = registry.get("ma_golden_cross")
+    result = registry.validate_params("ma_golden_cross", {"fast_period": 5, "slow_period": 20})
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Literal
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+class ConditionCategory(str, Enum):
+    """Classification of condition purpose."""
+
+    ENTRY = "entry"
+    EXIT = "exit"
+    FILTER = "filter"
+
+
+class TranslatorDialect(str, Enum):
+    """Supported translation targets."""
+
+    DUCKDB = "duckdb"
+    POLARS = "polars"
+    BOTH = "both"
+
+
+# ---------------------------------------------------------------------------
+# Data classes
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ParamSchema:
+    """Schema for a single parameter.
+
+    Attributes:
+        name: Parameter name.
+        param_type: JSON Schema type ("string", "number", "integer", "boolean", "array").
+        required: Whether this parameter is mandatory.
+        default: Default value if not provided.
+        description: Human-readable description.
+        constraints: Additional JSON Schema constraints (min, max, enum, etc.).
+    """
+
+    name: str
+    param_type: Literal["string", "number", "integer", "boolean", "array"]
+    required: bool = True
+    default: Any = None
+    description: str = ""
+    constraints: dict[str, Any] = field(default_factory=dict)
+
+    def to_json_schema(self) -> dict[str, Any]:
+        """Convert to JSON Schema property definition."""
+        schema: dict[str, Any] = {"type": self.param_type, "description": self.description}
+        schema.update(self.constraints)
+        return schema
+
+
+@dataclass(frozen=True)
+class ConditionSpec:
+    """Specification for a registered condition type.
+
+    Attributes:
+        condition_type: Unique type identifier (snake_case).
+        category: Primary category (entry, exit, filter).
+        params: List of parameter schemas.
+        translator: Supported translation dialect(s).
+        description: Human-readable description.
+        examples: Example parameter sets for documentation.
+    """
+
+    condition_type: str
+    category: ConditionCategory
+    params: list[ParamSchema]
+    translator: TranslatorDialect
+    description: str = ""
+    examples: list[dict[str, Any]] = field(default_factory=list)
+
+    def get_param(self, name: str) -> ParamSchema | None:
+        """Get parameter schema by name."""
+        for p in self.params:
+            if p.name == name:
+                return p
+        return None
+
+    def get_required_params(self) -> list[ParamSchema]:
+        """Get all required parameters."""
+        return [p for p in self.params if p.required]
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    """Result of parameter validation."""
+
+    valid: bool
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Registry
+# ---------------------------------------------------------------------------
+
+class ConditionRegistry:
+    """Central registry for all condition types.
+
+    Thread-safe for reads after initialization. Register all types at startup.
+    """
+
+    def __init__(self) -> None:
+        self._registry: dict[str, ConditionSpec] = {}
+
+    # -- Registration -----------------------------------------------------
+
+    def register(self, spec: ConditionSpec) -> None:
+        """Register a condition type.
+
+        Raises:
+            ValueError: If condition_type already registered or invalid.
+        """
+        if not spec.condition_type:
+            raise ValueError("condition_type must not be empty")
+        if spec.condition_type in self._registry:
+            raise ValueError(
+                f"Condition type '{spec.condition_type}' is already registered"
+            )
+        self._registry[spec.condition_type] = spec
+
+    def register_many(self, specs: list[ConditionSpec]) -> None:
+        """Register multiple condition types."""
+        for spec in specs:
+            self.register(spec)
+
+    # -- Queries ----------------------------------------------------------
+
+    def get(self, condition_type: str) -> ConditionSpec:
+        """Get specification for a condition type.
+
+        Raises:
+            KeyError: If condition_type is not registered.
+        """
+        if condition_type not in self._registry:
+            raise KeyError(
+                f"Unknown condition type: '{condition_type}'. "
+                f"Registered types: {list(self._registry.keys())}"
+            )
+        return self._registry[condition_type]
+
+    def has(self, condition_type: str) -> bool:
+        """Check if a condition type is registered."""
+        return condition_type in self._registry
+
+    def list_all(self) -> list[ConditionSpec]:
+        """List all registered condition types."""
+        return list(self._registry.values())
+
+    def list_by_category(self, category: ConditionCategory | str) -> list[ConditionSpec]:
+        """List condition types by category."""
+        cat = ConditionCategory(category) if isinstance(category, str) else category
+        return [s for s in self._registry.values() if s.category == cat]
+
+    def list_by_translator(self, dialect: TranslatorDialect | str) -> list[ConditionSpec]:
+        """List condition types supporting a specific dialect."""
+        d = TranslatorDialect(dialect) if isinstance(dialect, str) else dialect
+        if d == TranslatorDialect.BOTH:
+            return list(self._registry.values())
+        return [
+            s
+            for s in self._registry.values()
+            if s.translator in (d, TranslatorDialect.BOTH)
+        ]
+
+    # -- Validation -------------------------------------------------------
+
+    def validate_params(self, condition_type: str, params: dict[str, Any]) -> ValidationResult:
+        """Validate parameters against a condition type's schema.
+
+        Returns:
+            ValidationResult with detailed error messages.
+        """
+        errors: list[str] = []
+        warnings: list[str] = []
+
+        try:
+            spec = self.get(condition_type)
+        except KeyError as e:
+            return ValidationResult(valid=False, errors=[str(e)])
+
+        # Check required params
+        for req in spec.get_required_params():
+            if req.name not in params:
+                errors.append(f"Missing required parameter: '{req.name}'")
+                continue
+            val = params[req.name]
+            err = self._check_type(req, val)
+            if err:
+                errors.append(err)
+            else:
+                err = self._check_constraints(req, val)
+                if err:
+                    errors.append(err)
+
+        # Check unknown params
+        known = {p.name for p in spec.params}
+        for key in params:
+            if key not in known:
+                warnings.append(f"Unknown parameter: '{key}' (will be ignored)")
+
+        # Check optional params with provided values
+        for opt in spec.params:
+            if not opt.required and opt.name in params:
+                err = self._check_type(opt, params[opt.name])
+                if err:
+                    errors.append(err)
+                else:
+                    err = self._check_constraints(opt, params[opt.name])
+                    if err:
+                        errors.append(err)
+
+        return ValidationResult(valid=len(errors) == 0, errors=errors, warnings=warnings)
+
+    @staticmethod
+    def _check_type(param: ParamSchema, value: Any) -> str | None:
+        """Check if value matches the declared parameter type."""
+        type_map = {
+            "string": str,
+            "number": (int, float),
+            "integer": int,
+            "boolean": bool,
+            "array": list,
+        }
+        expected = type_map.get(param.param_type)
+        if expected is None:
+            return None  # Unknown type, skip
+        if not isinstance(value, expected):
+            return (
+                f"Parameter '{param.name}' expects type '{param.param_type}', "
+                f"got '{type(value).__name__}'"
+            )
+        return None
+
+    @staticmethod
+    def _check_constraints(param: ParamSchema, value: Any) -> str | None:
+        """Check value against parameter constraints."""
+        constraints = param.constraints
+
+        # Numeric constraints
+        if param.param_type in ("number", "integer"):
+            if "minimum" in constraints and value < constraints["minimum"]:
+                return (
+                    f"Parameter '{param.name}' value {value} is below "
+                    f"minimum {constraints['minimum']}"
+                )
+            if "maximum" in constraints and value > constraints["maximum"]:
+                return (
+                    f"Parameter '{param.name}' value {value} exceeds "
+                    f"maximum {constraints['maximum']}"
+                )
+
+        # Enum constraint
+        if "enum" in constraints and value not in constraints["enum"]:
+            return (
+                f"Parameter '{param.name}' value '{value}' not in allowed values: "
+                f"{constraints['enum']}"
+            )
+
+        # Array minItems
+        if param.param_type == "array" and "minItems" in constraints:
+            if len(value) < constraints["minItems"]:
+                return (
+                    f"Parameter '{param.name}' array must have at least "
+                    f"{constraints['minItems']} items, got {len(value)}"
+                )
+
+        return None
+
+    # -- Factory ----------------------------------------------------------
+
+    @classmethod
+    def default(cls) -> ConditionRegistry:
+        """Create a registry with all MVP condition types pre-registered."""
+        registry = cls()
+        registry.register_many(_MVP_CONDITIONS)
+        return registry
+
+
+# ---------------------------------------------------------------------------
+# MVP Condition Definitions
+# ---------------------------------------------------------------------------
+
+_MVP_CONDITIONS: list[ConditionSpec] = [
+    # -- Moving Average Conditions ----------------------------------------
+    ConditionSpec(
+        condition_type="ma_golden_cross",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(
+                name="fast_period",
+                param_type="integer",
+                required=True,
+                description="Fast moving average period",
+                constraints={"minimum": 1, "maximum": 252},
+            ),
+            ParamSchema(
+                name="slow_period",
+                param_type="integer",
+                required=True,
+                description="Slow moving average period",
+                constraints={"minimum": 1, "maximum": 252},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Fast MA crosses above slow MA (golden cross)",
+        examples=[{"fast_period": 5, "slow_period": 20}],
+    ),
+    ConditionSpec(
+        condition_type="ma_death_cross",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(
+                name="fast_period",
+                param_type="integer",
+                required=True,
+                description="Fast moving average period",
+                constraints={"minimum": 1, "maximum": 252},
+            ),
+            ParamSchema(
+                name="slow_period",
+                param_type="integer",
+                required=True,
+                description="Slow moving average period",
+                constraints={"minimum": 1, "maximum": 252},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Fast MA crosses below slow MA (death cross)",
+        examples=[{"fast_period": 5, "slow_period": 20}],
+    ),
+    ConditionSpec(
+        condition_type="price_cross_ma",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(
+                name="timeframe",
+                param_type="string",
+                required=True,
+                description="Price timeframe",
+                constraints={"enum": ["D1", "W1", "M1"]},
+            ),
+            ParamSchema(
+                name="ma_period",
+                param_type="integer",
+                required=True,
+                description="Moving average period",
+                constraints={"minimum": 1, "maximum": 252},
+            ),
+            ParamSchema(
+                name="direction",
+                param_type="string",
+                required=True,
+                description="Cross direction",
+                constraints={"enum": ["above", "below"]},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Price crosses above/below a moving average",
+        examples=[{"timeframe": "D1", "ma_period": 20, "direction": "above"}],
+    ),
+    # -- State Conditions -------------------------------------------------
+    ConditionSpec(
+        condition_type="state_hex_in",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(
+                name="timeframe",
+                param_type="string",
+                required=True,
+                description="State cube timeframe",
+                constraints={"enum": ["MN1", "W1", "D1"]},
+            ),
+            ParamSchema(
+                name="values",
+                param_type="array",
+                required=True,
+                description="Allowed hex state values",
+                constraints={"minItems": 1},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="State hex value is in the allowed set",
+        examples=[{"timeframe": "D1", "values": ["0x01", "0x02"]}],
+    ),
+    ConditionSpec(
+        condition_type="state_ef_count",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(
+                name="operator",
+                param_type="string",
+                required=True,
+                description="Comparison operator",
+                constraints={"enum": [">", "<", ">=", "<=", "=="]},
+            ),
+            ParamSchema(
+                name="value",
+                param_type="integer",
+                required=True,
+                description="EF count threshold",
+                constraints={"minimum": 0, "maximum": 10},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="EF (Expansion Factor) count comparison",
+        examples=[{"operator": ">=", "value": 3}],
+    ),
+    # -- Volume Conditions ------------------------------------------------
+    ConditionSpec(
+        condition_type="volume_ratio",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(
+                name="lookback",
+                param_type="integer",
+                required=True,
+                description="Lookback period for average volume",
+                constraints={"minimum": 1, "maximum": 60},
+            ),
+            ParamSchema(
+                name="operator",
+                param_type="string",
+                required=True,
+                description="Comparison operator",
+                constraints={"enum": [">", "<", ">=", "<=", "=="]},
+            ),
+            ParamSchema(
+                name="value",
+                param_type="number",
+                required=True,
+                description="Volume ratio threshold",
+                constraints={"minimum": 0.0},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Volume ratio compared to lookback average",
+        examples=[{"lookback": 20, "operator": ">", "value": 1.5}],
+    ),
+    # -- Industry Filters -------------------------------------------------
+    ConditionSpec(
+        condition_type="industry_include",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(
+                name="values",
+                param_type="array",
+                required=True,
+                description="Industries to include",
+                constraints={"minItems": 1},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Stock industry is in the include list",
+        examples=[{"values": ["电子", "医药生物"]}],
+    ),
+    ConditionSpec(
+        condition_type="industry_exclude",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(
+                name="values",
+                param_type="array",
+                required=True,
+                description="Industries to exclude",
+                constraints={"minItems": 1},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Stock industry is NOT in the exclude list",
+        examples=[{"values": ["银行", "房地产"]}],
+    ),
+    # -- Risk Conditions --------------------------------------------------
+    ConditionSpec(
+        condition_type="stop_loss_pct",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(
+                name="value",
+                param_type="number",
+                required=True,
+                description="Stop loss percentage (0-1)",
+                constraints={"minimum": 0.0, "maximum": 1.0},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Exit when loss exceeds specified percentage",
+        examples=[{"value": 0.08}],
+    ),
+    ConditionSpec(
+        condition_type="take_profit_pct",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(
+                name="value",
+                param_type="number",
+                required=True,
+                description="Take profit percentage (0-1)",
+                constraints={"minimum": 0.0, "maximum": 1.0},
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Exit when profit exceeds specified percentage",
+        examples=[{"value": 0.15}],
+    ),
+    # -- Market Filters ---------------------------------------------------
+    ConditionSpec(
+        condition_type="limit_up_filter",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(
+                name="allow",
+                param_type="boolean",
+                required=True,
+                description="Whether to allow limit-up stocks",
+            ),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Filter limit-up (涨停) stocks",
+        examples=[{"allow": False}],
+    ),
+]

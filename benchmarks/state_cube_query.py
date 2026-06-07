@@ -30,6 +30,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--synthetic", action="store_true")
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument("--queries", type=int, default=50)
+    parser.add_argument("--runs", type=int, default=5, help="Repeat query sets")
+    parser.add_argument(
+        "--symbols", type=str, default="5000", help="Symbol count for synthetic data"
+    )
+    parser.add_argument("--days", type=int, default=252, help="Days for synthetic data")
     return parser.parse_args()
 
 
@@ -37,6 +42,7 @@ def benchmark_mode(
     mode: str,
     db_path: str,
     queries_n: int,
+    runs: int,
     is_synthetic: bool,
 ) -> list[dict]:
     con = duckdb.connect(db_path)
@@ -53,51 +59,61 @@ def benchmark_mode(
         con.close()
 
     rng = random.Random(42)
-    query_specs = []
-    for _ in range(queries_n):
-        date = rng.choice(dates)
-        if mode == "no_cache":
-            cols = "*"
-        else:
-            cols = "symbol, date, d1_state, w1_state, mn1_state"
-        query_specs.append((date, cols))
+    all_times: list[list[float]] = []
 
-    times = []
-    if mode == "lru_cache":
+    for _ in range(runs):
+        query_specs = []
+        for _ in range(queries_n):
+            date = rng.choice(dates)
+            if mode == "no_cache":
+                cols = (
+                    "symbol, date, d1_state, w1_state, mn1_state, "
+                    "h4_state, h1_state, ef_width, ef_count"
+                )
+            else:
+                cols = "symbol, date, d1_state, w1_state, mn1_state"
+            query_specs.append((date, cols))
 
-        @lru_cache(maxsize=5)
-        def cached_query(date: str, cols: str) -> pl.DataFrame:
-            c = duckdb.connect(db_path)
-            try:
-                df = c.execute(
-                    f"SELECT {cols} FROM state_cube WHERE date = ?", [date]
-                ).pl()
-            finally:
-                c.close()
-            return df
+        times = []
+        if mode == "lru_cache":
 
-        for date, cols in query_specs:
-            t0 = time.perf_counter()
-            df = cached_query(date, cols)
-            _ = df.shape
-            t1 = time.perf_counter()
-            times.append(t1 - t0)
-    else:
-        con = duckdb.connect(db_path)
-        try:
+            @lru_cache(maxsize=5)
+            def cached_query(date: str, cols: str) -> pl.DataFrame:
+                c = duckdb.connect(db_path)
+                try:
+                    df = c.execute(
+                        f"SELECT {cols} FROM state_cube WHERE date = ?", [date]
+                    ).pl()
+                finally:
+                    c.close()
+                return df
+
             for date, cols in query_specs:
                 t0 = time.perf_counter()
-                df = con.execute(
-                    f"SELECT {cols} FROM state_cube WHERE date = ?", [date]
-                ).pl()
+                df = cached_query(date, cols)
                 _ = df.shape
                 t1 = time.perf_counter()
                 times.append(t1 - t0)
-        finally:
-            con.close()
+        else:
+            con = duckdb.connect(db_path)
+            try:
+                for date, cols in query_specs:
+                    t0 = time.perf_counter()
+                    df = con.execute(
+                        f"SELECT {cols} FROM state_cube WHERE date = ?", [date]
+                    ).pl()
+                    _ = df.shape
+                    t1 = time.perf_counter()
+                    times.append(t1 - t0)
+            finally:
+                con.close()
 
-    times_sorted = sorted(times)
-    p50 = statistics.median(times)
+        all_times.append(times)
+
+    # Flatten all runs for p50/p95, but keep per-run records
+    flat_times = [t for run in all_times for t in run]
+    times_sorted = sorted(flat_times)
+    p50 = statistics.median(flat_times)
     p95 = (
         times_sorted[int(len(times_sorted) * 0.95)]
         if len(times_sorted) > 1
@@ -105,31 +121,35 @@ def benchmark_mode(
     )
 
     records = []
-    for run_index, elapsed in enumerate(times):
-        records.append(
-            {
-                "benchmark_name": "state_cube_query",
-                "mode": mode,
-                "universe_n": None,
-                "days": len(dates),
-                "run_index": run_index,
-                "elapsed_s": round(elapsed, 6),
-                "p50_s": round(p50, 6),
-                "p95_s": round(p95, 6),
-                "data_source": "synthetic" if is_synthetic else "real",
-                "python_version": platform.python_version(),
-                "platform": platform.platform(),
-                "notes": f"queries={queries_n}",
-            }
-        )
+    run_offset = 0
+    for run_index, times in enumerate(all_times):
+        for elapsed in times:
+            records.append(
+                {
+                    "benchmark_name": "state_cube_query",
+                    "mode": mode,
+                    "universe_n": None,
+                    "days": len(dates),
+                    "run_index": run_offset,
+                    "elapsed_s": round(elapsed, 6),
+                    "p50_s": round(p50, 6),
+                    "p95_s": round(p95, 6),
+                    "data_source": "synthetic" if is_synthetic else "real",
+                    "python_version": platform.python_version(),
+                    "platform": platform.platform(),
+                    "notes": f"queries={queries_n}, set={run_index}",
+                }
+            )
+            run_offset += 1
     return records
 
 
 def main() -> None:
     args = parse_args()
     db_path = args.db_path
+    symbols = int(args.symbols.split(",")[0].strip())
     if args.synthetic:
-        db_path = create_synthetic_db(symbols=5000, days=252)
+        db_path = create_synthetic_db(symbols=symbols, days=args.days)
 
     output_path = (
         args.output
@@ -139,7 +159,9 @@ def main() -> None:
 
     all_records: list[dict] = []
     for mode in ["no_cache", "pruned", "lru_cache"]:
-        records = benchmark_mode(mode, db_path, args.queries, args.synthetic)
+        records = benchmark_mode(
+            mode, db_path, args.queries, args.runs, args.synthetic
+        )
         all_records.extend(records)
 
     with open(output_path, "w", encoding="utf-8") as f:

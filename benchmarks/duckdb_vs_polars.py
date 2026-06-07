@@ -30,21 +30,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db-path", type=str, default="data/p116_foundation.duckdb")
     parser.add_argument("--synthetic", action="store_true")
     parser.add_argument("--output", type=str, default=None)
-    parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--runs", type=int, default=5, help="Repeat runs per config")
+    parser.add_argument(
+        "--symbols",
+        type=str,
+        default="500,2000,5000",
+        help="Comma-separated symbol counts to benchmark",
+    )
+    parser.add_argument("--days", type=int, default=252, help="Days for synthetic data")
     return parser.parse_args()
+
+
+def _parse_symbols(s: str) -> list[int]:
+    return [int(x.strip()) for x in s.split(",")]
 
 
 def benchmark_mode(
     universe_n: int,
+    days: int,
     mode: str,
     db_path: str,
-    repeats: int,
+    runs: int,
     is_synthetic: bool,
 ) -> list[dict]:
     con = duckdb.connect(db_path)
     times = []
     try:
-        for run_index in range(repeats):
+        for run_index in range(runs):
             t0 = time.perf_counter()
             if mode == "duckdb_only":
                 _ = con.execute(
@@ -60,7 +72,7 @@ def benchmark_mode(
                         )
                         WINDOW w AS (PARTITION BY symbol ORDER BY date)
                     )
-                    SELECT * FROM signals WHERE entry = 1
+                    SELECT symbol, date, entry FROM signals WHERE entry = 1
                     """
                 ).pl()
             else:  # duckdb_load_polars
@@ -104,7 +116,7 @@ def benchmark_mode(
                 "benchmark_name": "duckdb_vs_polars",
                 "mode": mode,
                 "universe_n": universe_n,
-                "days": 252,
+                "days": days,
                 "run_index": run_index,
                 "elapsed_s": round(elapsed, 6),
                 "p50_s": round(p50, 6),
@@ -122,7 +134,9 @@ def main() -> None:
     args = parse_args()
     db_path = args.db_path
     if args.synthetic:
-        db_path = create_synthetic_db(symbols=5000, days=252)
+        db_path = create_synthetic_db(
+            symbols=max(_parse_symbols(args.symbols)), days=args.days
+        )
 
     output_path = (
         args.output
@@ -131,13 +145,14 @@ def main() -> None:
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     all_records: list[dict] = []
-    for universe_n in [500, 2000, 5000]:
+    for universe_n in _parse_symbols(args.symbols):
         for mode in ["duckdb_only", "duckdb_load_polars"]:
             records = benchmark_mode(
                 universe_n,
+                args.days,
                 mode,
                 db_path,
-                args.repeats,
+                args.runs,
                 args.synthetic,
             )
             all_records.extend(records)

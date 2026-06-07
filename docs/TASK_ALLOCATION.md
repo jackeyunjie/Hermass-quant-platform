@@ -353,6 +353,21 @@
 - 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/strategy_lab/tests -q`，162 passed。
 - 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m py_compile hermass_platform/strategy_lab/*.py`，通过。
 
+下一轮任务：
+- `agents/QODER_NEXT_TASK_PHASE1_DUCKDB_PREVIEW_STORAGE_AUDIT.md`
+
+### C7.1: Phase 1 DuckDB Preview / Storage / Audit 派工
+
+交付：
+- `agents/QODER_NEXT_TASK_PHASE1_DUCKDB_PREVIEW_STORAGE_AUDIT.md`
+
+验收：
+- Qoder 实现真实 DuckDB preview provider，至少覆盖 MA、volume、limit_up、state 条件。
+- Qoder 实现最小 `storage.py` 和 `audit.py`，支持 trace_id/input_hash/output_hash/red_line_result 落库。
+- `stop_loss_pct` / `take_profit_pct` 继续不阻塞 preview，只标记 requires backtest context。
+
+状态：已完成派工。
+
 ### C8: 高配因子库派工
 
 交付：

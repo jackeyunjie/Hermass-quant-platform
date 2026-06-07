@@ -11,6 +11,7 @@
 - [[decisions/0005-phase2-hot-path-gates]]
 - [[decisions/0006-phase1-preview-metadata-design]]
 - [[decisions/0007-factor-library-expansion-direction]]
+- [[decisions/0008-broad-factor-source-evidence-governance]]
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]

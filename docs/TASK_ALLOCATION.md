@@ -255,6 +255,11 @@
 任务文件：
 - `agents/KIMI_NEXT_TASK_BROAD_FACTOR_SOURCE_RESEARCH.md`
 
+状态更新：
+- Kimi 已完成，文件：`data/research/conversations/agent-runs/2026-06-06-kimi-broad-factor-source-research.md`。
+- 候选数：278 条 factor/block。
+- Codex 裁决：进入 research catalog，不直接进入 production DSL。
+
 ## Codex 任务
 
 ### C1: 项目协作资产
@@ -385,6 +390,10 @@
 - evidence level 进入后续 schema 设计。
 
 状态：已完成。
+
+状态更新：
+- Qoder 已完成 source/evidence schema，文件：`agents/FACTOR_SOURCE_SCHEMA.md`。
+- Codex 已新增决策 `0008-broad-factor-source-evidence-governance.md`。
 
 ### C3: Phase 1 API 与预览
 

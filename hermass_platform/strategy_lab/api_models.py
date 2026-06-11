@@ -263,8 +263,11 @@ class BacktestMetrics(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     total_return: float | None = Field(default=None)
+    annual_return: float | None = Field(default=None)
     sharpe_ratio: float | None = Field(default=None)
     max_drawdown: float | None = Field(default=None)
+    profit_factor: float | None = Field(default=None)
+    trade_count: int | None = Field(default=None)
     total_trades: int | None = Field(default=None)
     win_rate: float | None = Field(default=None)
 

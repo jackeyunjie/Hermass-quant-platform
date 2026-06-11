@@ -97,6 +97,27 @@
 下一轮任务 2：
 - `agents/QODER_NEXT_TASK_PHASE1_CODE_PATCH.md`
 
+### Q4: 2026-06-08 MVP E2E 样例 Contract
+
+交付：
+- 冻结 3 个中文策略样例。
+- 为每个样例给出期望 DSL v2 完整 JSON。
+- 定义本周中文输入到 DSL 的确定性映射规则。
+- 定义 E2E runner 的 service-level 接口。
+- 定义 Light Backtest 本周最小指标口径。
+- 定义同一 `trace_id` 下的 audit operation 顺序。
+- 定义主链路问题清单模板。
+
+验收：
+- Codex 能按 contract 实现 `中文策略输入 -> DSL -> 校验 -> Preview -> Light Backtest -> Audit` 的样例级 runner。
+- `MA5上穿MA20买入，跌破MA10卖出，止损8%` 能生成合法 DSL。
+- 缺少止损和仓位超过 25% 的样例能被红线拒绝并留下 audit。
+- 3 个样例能在 mock preview 下稳定返回命中数量。
+- Light Backtest 允许本周使用 stub/light_mock，但必须写入 storage 和 audit，且不得伪装成真实绩效。
+
+下一轮任务：
+- `agents/QODER_NEXT_TASK_2026_06_08_E2E_SAMPLES.md`
+
 ## Kimi 任务
 
 ### K1: Light Backtest 性能基准
@@ -267,6 +288,132 @@
 
 下一轮任务：
 - `agents/KIMI_NEXT_TASK_FACTOR_CATALOG_CURATION.md`
+
+### K9: 产品最终目标与服务边界澄清
+
+交付：
+- `agents/KIMI_NEXT_TASK_PRODUCT_SCOPE_SERVICE_BOUNDARY.md`
+- `data/research/conversations/agent-runs/2026-06-10-kimi-product-scope-service-boundary.md`
+
+验收：
+- 明确最终产品不是自动荐股/自动交易系统，而是 DSL-first 的 AI 量化策略实验与审计平台。
+- 明确 P0/P1/P2 用户，以及非目标用户。
+- 明确 MVP Services、P1 Services、Explicit Non-Services。
+- 明确 P0 用户 MVP journey，每一步包含用户看到什么、系统内部做什么、失败提示和审计要求。
+- 明确服务文案红线，避免回测结果或 Agent 评审被误解为收益承诺或投资建议。
+- 明确工程影响：哪些 API/UI/audit 字段必须优先，哪些 Kimi 研究成果进入 backlog 而不阻塞 MVP。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_PRODUCT_SCOPE_SERVICE_BOUNDARY.md`
+
+### K10: GitHub 与 Obsidian 及时同步纪律
+
+交付：
+- `agents/KIMI_NEXT_TASK_GITHUB_OBSIDIAN_SYNC_DISCIPLINE.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-github-obsidian-sync-discipline.md`
+
+验收：
+- 明确哪些内容应同步 GitHub，哪些内容不得进 GitHub。
+- 明确哪些内容应同步 Obsidian Vault，哪些内容不得进 Vault。
+- 给出每次 Kimi 交付后的 GitHub sync checklist 与 Obsidian sync checklist。
+- 给出 Kimi 无 GitHub push 权限时的 handoff 模板。
+- 对当前工作区做一次同步审计，分类未提交文件并标注建议提交/忽略/补记录事项。
+- 不把 `outputs/`、临时 DuckDB、缓存或敏感凭据作为同步交付物。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_GITHUB_OBSIDIAN_SYNC_DISCIPLINE.md`
+
+状态更新：
+- Kimi 已完成同步纪律文档，文件：`data/research/conversations/agent-runs/2026-06-11-kimi-github-obsidian-sync-discipline.md`。
+- Codex 初步复核：文档包含 Sync Policy、GitHub/Obsidian checklist、cadence、handoff template 和当前 dirty worktree 同步审计。
+- 审计结论采纳：`outputs/` 已被 `.gitignore` 覆盖；`6月8日工作计划.MD` 建议不提交；`dsl_schema.py` 约束放宽已在 `2026-06-08-codex-mvp-e2e-runner-acceptance.md` 记录 follow-up review。
+
+### K11: 对外服务准备度与邀请制试点方案
+
+Codex 判断：
+- 当前可以对外提供服务，但只能做受控、邀请制、研究用途试点。
+- 当前不能公开商业化开放，不能提供投资建议、自动荐股、真实下单、资金托管或收益承诺。
+
+交付：
+- `agents/KIMI_NEXT_TASK_EXTERNAL_SERVICE_READINESS_PILOT.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-external-service-readiness-pilot.md`
+- `data/research/conversations/decisions/0010-external-service-readiness.md`
+
+验收：
+- 给出明确 readiness verdict，默认应为 `CONTROLLED_PILOT_ONLY`。
+- 列出当前允许对外提供的服务和明确禁止服务。
+- 定义邀请制试点用户画像、进入前提和风险确认。
+- 给出试点服务流程，每一步说明用户看到什么、系统做什么、是否有投资建议风险、如何避免越界、是否审计。
+- 给出对外介绍文案、禁止宣传话术、回测免责声明、AI/Agent 输出免责声明、风险提示最低文案。
+- 给出工程 go/no-go checklist 和法律/合规复核 checklist。
+- 给出从邀请制试点升级到 public beta 的条件。
+- 给出第一轮最小试点计划。
+- 按 K10 同步纪律写入 Obsidian 并提供 GitHub handoff。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_EXTERNAL_SERVICE_READINESS_PILOT.md`
+
+状态更新：
+- Kimi 已完成外部服务准备度与试点方案，文件：`data/research/conversations/agent-runs/2026-06-11-kimi-external-service-readiness-pilot.md`。
+- Kimi 结论：`CONTROLLED_PILOT_ONLY`，当前只允许 5 人/2 周的邀请制研究试点，禁止公开商业化、投资建议、真实下单、资金托管、自动交易和收益承诺。
+- Codex 采纳方向：公开增长前必须先解决 service boundary、免责声明、真实 Light Backtest 与 GitHub 开源成熟度。
+
+### K12: GitHub 多星增长与开源成熟度计划
+
+Codex 判断：
+- 当前 GitHub stars 为 `0`，仓库公开但不具备自然增长条件。
+- 先完成仓库成熟化，再做 soft launch；禁止刷星、买星或用投资收益话术引流。
+
+交付：
+- `agents/KIMI_NEXT_TASK_GITHUB_STARS_GROWTH_PLAN.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-github-stars-growth-plan.md`
+
+验收：
+- 给出 star readiness verdict，默认应为 `NOT_READY_TO_PROMOTE`。
+- 审计当前仓库首页、README、license、topics、demo、quickstart、roadmap、disclaimer、release 等缺口。
+- 定义合规安全的开源定位：DSL-first、red-line-first、audit-first、not investment advice、no real trading。
+- 输出 P0/P1/P2 GitHub improvement backlog。
+- 给出 README rewrite outline，能直接交给 Codex 实施。
+- 给出 repository description、topics、license 选项和 release 建议。
+- 给出保守 star targets：0->5、5->20、20->100、100+。
+- 给出 soft launch plan 和 compliance-safe copy。
+- 按 K10 同步纪律写入 Obsidian 并提供 GitHub handoff。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_GITHUB_STARS_GROWTH_PLAN.md`
+
+### KIMI2-1: 数据刷新 / 补充 / 替换必要性审计
+
+Codex 判断：
+- MVP 样例级链路可以继续使用 deterministic mock / synthetic preview，不因真实数据缺口阻塞。
+- 真实 Light Backtest、邀请制试点、GitHub demo 和 public beta 前，必须完成数据新鲜度、覆盖率、偏差、授权和 `light_stub` 标注审计。
+- 当前不应默认“换数据源”，应逐类判断 `freeze`、`refresh`、`supplement`、`replace` 或 `defer`。
+
+交付：
+- `agents/KIMI2_NEXT_TASK_DATA_REFRESH_REPLACEMENT_AUDIT.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi2-data-refresh-replacement-audit.md`
+
+验收：
+- 给出总 verdict：`NO_CHANGE_FREEZE` / `REFRESH_REQUIRED` / `SUPPLEMENT_REQUIRED` / `REPLACE_REQUIRED` / `MIXED`。
+- 盘点 `p116_foundation.duckdb`、`state_cube.duckdb`、`market_assets.duckdb`、Blackwolf daily、Blackwolf moneyflow、factor registry、synthetic fixture、mock preview 和 `light_stub` 输出。
+- 对每类数据给出 `freeze` / `refresh` / `supplement` / `replace` / `defer` 决策矩阵。
+- 明确哪些数据缺口阻塞 MVP、Phase 2 真实回测、邀请制试点、public beta。
+- 给出真实 Light Backtest 前的数据契约和验证命令。
+- 覆盖数据过旧、未来函数、复权口径、幸存者偏差、停牌退市、行业分类漂移、授权风险和 mock 被误解风险。
+- 按 K10 同步纪律输出 GitHub / Obsidian handoff。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI2_NEXT_TASK_DATA_REFRESH_REPLACEMENT_AUDIT.md`
 
 ## Codex 任务
 
@@ -470,6 +617,62 @@
 - Codex 复核并修正 `EvidenceRegistry` 重复 evidence 异常类型，新增 `DuplicateEvidenceError`。
 - 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/factors/tests -q`，57 passed。
 - 验收：`/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m py_compile hermass_platform/factors/*.py`，通过。
+
+### C14: Strategy Lab MVP E2E 验收入口
+
+交付：
+- `scripts/run_strategy_lab_mvp_e2e_acceptance.py`
+- `data/research/conversations/agent-runs/2026-06-09-codex-mvp-e2e-acceptance-script.md`
+
+验收：
+- 3 个冻结中文策略样例全部走通 generation -> validation -> preview -> backtest。
+- 缺少止损样例触发 `RL_EXIT_MUST_HAVE_STOP_LOSS`，且不执行 preview/backtest。
+- 仓位 30% 样例触发 `RL_MAX_POSITION`，且不执行 preview/backtest。
+- 每个样例保留同一 `trace_id` 下的 audit 记录。
+
+状态：已完成。
+
+复核命令：
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python scripts/run_strategy_lab_mvp_e2e_acceptance.py --run-id final`
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/strategy_lab/tests -q`
+
+复核结果：
+- E2E acceptance：5/5 cases passed。
+- Strategy Lab tests：197 passed, 1 warning。
+
+### C15: GitHub 成熟化 P0/P1 基础资产
+
+交付：
+- `README.md`
+- `CONTRIBUTING.md`
+- `.github/ISSUE_TEMPLATE/bug_report.md`
+- `.github/ISSUE_TEMPLATE/feature_request.md`
+- `docs/github/METADATA_RECOMMENDATIONS.md`
+- `examples/strategy_lab/sample_ma_5_20_stop_8.json`
+- `examples/strategy_lab/sample_state_volume_stop_8_take_15.json`
+- `examples/strategy_lab/sample_ma_state_limit_filter.json`
+- `hermass_platform/strategy_lab/tests/test_examples.py`
+- `data/research/conversations/agent-runs/2026-06-11-codex-github-maturity-p0.md`
+
+验收：
+- README 能在 30 秒内说明项目是 DSL-first、red-line-first、audit-first 的策略研究框架。
+- README Quickstart 不使用本机绝对 Python 路径。
+- README 明确 `light_stub` 不是真实绩效，不提供投资建议、不荐股、不交易。
+- 3 个公开 example DSL 文件能通过 `StrategyDSL` 和 `validate_dsl` 校验。
+- GitHub Issue 模板和 CONTRIBUTING 明确禁止投资建议、真实交易、收益承诺。
+- GitHub Description、Topics、License 的建议写入文档；用户已确认 Apache-2.0。
+
+状态：已完成。Apache-2.0 已确认并落地，GitHub Description / Topics 已通过 GitHub API 更新。
+
+复核命令：
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/strategy_lab/tests -q`
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python scripts/run_strategy_lab_mvp_e2e_acceptance.py`
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/strategy_lab/tests/test_examples.py -q`
+
+复核结果：
+- Strategy Lab tests：198 passed, 1 warning。
+- E2E acceptance：5/5 cases passed。
+- Example DSL tests：1 passed, 1 warning。
 
 ### C3: Phase 1 API 与预览
 

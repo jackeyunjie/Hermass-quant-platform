@@ -212,10 +212,17 @@ class TestRedLines:
         assert not any(e.code == RL_MAX_POSITION for e in result.errors)
 
     def test_stop_loss_required(self, registry: ConditionRegistry) -> None:
-        # Pydantic Literal[True] prevents False, but test the validator path
-        # We can't easily create a DSL with stop_loss_required=False due to Pydantic
-        # So we test check_red_lines with a mock scenario
-        pass  # Covered by Pydantic validation
+        strategy = create_ma_crossover_strategy("test_stop_loss_required")
+        bad_risk = RiskConfig(
+            risk_per_trade=0.02,
+            max_position_pct=0.20,
+            stop_loss_required=False,
+        )
+        strategy = strategy.model_copy(update={"risk": bad_risk})
+        result = validate_dsl(strategy, registry)
+        assert result.passed is False
+        assert result.has_red_line_violation is True
+        assert any(e.code == RL_STOP_LOSS_REQUIRED for e in result.errors)
 
     def test_missing_stop_loss_condition(self, registry: ConditionRegistry) -> None:
         strategy = StrategyDSL(

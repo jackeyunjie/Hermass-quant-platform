@@ -81,6 +81,10 @@ class RiskConfig(BaseModel):
         - risk_per_trade: 0 < x <= 0.10 (10% max per trade)
         - max_position_pct: 0 < x <= 0.25 (25% max position)
         - stop_loss_required: MUST be True (hard requirement)
+
+    Note: Pydantic constraints are intentionally relaxed (gt=0, le=1.0) to allow
+    DSL construction for red-line validation. The dsl_validator enforces the
+    actual limits via RED_LINE checks.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -88,16 +92,16 @@ class RiskConfig(BaseModel):
     risk_per_trade: float = Field(
         ...,
         gt=0.0,
-        le=0.10,
+        le=1.0,
         description="Maximum risk per trade as fraction of capital",
     )
     max_position_pct: float = Field(
         ...,
         gt=0.0,
-        le=0.25,
+        le=1.0,
         description="Maximum position size as fraction of portfolio",
     )
-    stop_loss_required: Literal[True] = Field(
+    stop_loss_required: bool = Field(
         default=True,
         description="Stop loss is mandatory - cannot be disabled",
     )

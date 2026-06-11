@@ -1,0 +1,52 @@
+{
+  "strategy_id": "sample_ma_5_20_stop_8",
+  "name": "MA交叉策略",
+  "schema_version": "strategy_dsl_v2",
+  "description": "MA5上穿MA20买入，跌破MA10卖出，止损8%",
+  "entry": [
+    {
+      "condition_type": "ma_golden_cross",
+      "params": {
+        "fast_period": 5,
+        "slow_period": 20
+      },
+      "logic": "and",
+      "weight": 1.0
+    }
+  ],
+  "filters": [
+    {
+      "condition_type": "limit_up_filter",
+      "params": {
+        "allow": false
+      },
+      "logic": "and",
+      "weight": 1.0
+    }
+  ],
+  "exit": [
+    {
+      "condition_type": "price_cross_ma",
+      "params": {
+        "timeframe": "D1",
+        "ma_period": 10,
+        "direction": "below"
+      },
+      "logic": "and",
+      "weight": 1.0
+    },
+    {
+      "condition_type": "stop_loss_pct",
+      "params": {
+        "value": 0.08
+      },
+      "logic": "or",
+      "weight": 1.0
+    }
+  ],
+  "risk": {
+    "risk_per_trade": 0.02,
+    "max_position_pct": 0.2,
+    "stop_loss_required": true
+  }
+}

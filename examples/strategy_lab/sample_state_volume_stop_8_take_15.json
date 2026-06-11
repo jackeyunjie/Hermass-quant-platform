@@ -1,0 +1,63 @@
+{
+  "strategy_id": "sample_state_volume_stop_8_take_15",
+  "name": "状态成交量策略",
+  "schema_version": "strategy_dsl_v2",
+  "description": "D1状态属于0x21或0x23，成交量放大到20日均量1.5倍以上买入，止损8%，止盈15%",
+  "entry": [
+    {
+      "condition_type": "state_hex_in",
+      "params": {
+        "timeframe": "D1",
+        "values": [
+          "0x21",
+          "0x23"
+        ]
+      },
+      "logic": "and",
+      "weight": 1.0
+    },
+    {
+      "condition_type": "volume_ratio",
+      "params": {
+        "lookback": 20,
+        "operator": ">",
+        "value": 1.5
+      },
+      "logic": "and",
+      "weight": 1.0
+    }
+  ],
+  "filters": [
+    {
+      "condition_type": "limit_up_filter",
+      "params": {
+        "allow": false
+      },
+      "logic": "and",
+      "weight": 1.0
+    }
+  ],
+  "exit": [
+    {
+      "condition_type": "stop_loss_pct",
+      "params": {
+        "value": 0.08
+      },
+      "logic": "or",
+      "weight": 1.0
+    },
+    {
+      "condition_type": "take_profit_pct",
+      "params": {
+        "value": 0.15
+      },
+      "logic": "or",
+      "weight": 1.0
+    }
+  ],
+  "risk": {
+    "risk_per_trade": 0.02,
+    "max_position_pct": 0.2,
+    "stop_loss_required": true
+  }
+}

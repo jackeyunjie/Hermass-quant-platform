@@ -91,27 +91,39 @@ class TestRiskConfig:
         assert risk.stop_loss_required is True
 
     def test_risk_per_trade_boundary(self) -> None:
-        # At upper boundary
+        # At red-line boundary
         risk = RiskConfig(risk_per_trade=0.10, max_position_pct=0.20)
         assert risk.risk_per_trade == 0.10
 
-        # Above upper boundary
+        # Above red-line boundary is structurally valid so validator can audit it.
+        risk = RiskConfig(risk_per_trade=0.11, max_position_pct=0.20)
+        assert risk.risk_per_trade == 0.11
+
+        # Structurally impossible risk still fails at schema layer.
         with pytest.raises(ValidationError):
-            RiskConfig(risk_per_trade=0.11, max_position_pct=0.20)
+            RiskConfig(risk_per_trade=1.01, max_position_pct=0.20)
 
     def test_max_position_boundary(self) -> None:
-        # At upper boundary (25%)
+        # At red-line boundary (25%)
         risk = RiskConfig(risk_per_trade=0.02, max_position_pct=0.25)
         assert risk.max_position_pct == 0.25
 
-        # Above upper boundary
+        # Above red-line boundary is structurally valid so validator can audit it.
+        risk = RiskConfig(risk_per_trade=0.02, max_position_pct=0.26)
+        assert risk.max_position_pct == 0.26
+
+        # Structurally impossible position still fails at schema layer.
         with pytest.raises(ValidationError):
-            RiskConfig(risk_per_trade=0.02, max_position_pct=0.26)
+            RiskConfig(risk_per_trade=0.02, max_position_pct=1.01)
 
     def test_stop_loss_must_be_true(self) -> None:
-        # Pydantic Literal[True] enforces this
-        with pytest.raises(ValidationError):
-            RiskConfig(risk_per_trade=0.02, max_position_pct=0.20, stop_loss_required=False)  # type: ignore
+        # False is structurally valid so validator can emit RL_STOP_LOSS_REQUIRED.
+        risk = RiskConfig(
+            risk_per_trade=0.02,
+            max_position_pct=0.20,
+            stop_loss_required=False,
+        )
+        assert risk.stop_loss_required is False
 
 
 # ---------------------------------------------------------------------------

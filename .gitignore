@@ -25,6 +25,9 @@ outputs/
 .idea/
 .vscode/
 
+# Personal local notes
+6月 8 日工作计划.MD
+
 # Obsidian local workspace state
 data/research/conversations/.obsidian/workspace*.json
 data/research/conversations/daily/

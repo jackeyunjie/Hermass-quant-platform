@@ -1,0 +1,676 @@
+"""E2E Runner - MVP end-to-end strategy execution.
+
+This module provides the unified entry point for the complete strategy lifecycle:
+    NL -> DSL -> Validation -> Red Line -> Preview -> Light Backtest -> Audit
+
+Design constraints:
+    - No LLM involvement. Template/rule-based NL parsing only.
+    - All outputs validate against StrategyDSL schema.
+    - Failed paths must still write audit records.
+    - Light backtest is stubbed and explicitly marked as such.
+"""
+
+from __future__ import annotations
+
+import re
+import hashlib
+import json
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+from .api_models import (
+    BacktestMetrics,
+    BacktestResponse,
+    PreviewResponse,
+    ValidateStrategyResponse,
+    ValidationErrorItem,
+)
+from .audit import StrategyAuditLogger
+from .backtest_adapter import run_dsl_backtest
+from .dsl_schema import ConditionBlock, RiskConfig, StrategyDSL
+from .dsl_validator import ValidationLevel, validate_dsl
+from .preview_service import PreviewConfig, PreviewService
+from .storage import StrategyLabStorage
+
+
+# ---------------------------------------------------------------------------
+# Result Model
+# ---------------------------------------------------------------------------
+
+class MvpE2EResult(BaseModel):
+    """端到端执行结果。"""
+
+    model_config = {"extra": "forbid"}
+
+    trace_id: str = Field(..., description="全局追踪 ID")
+    strategy_id: str = Field(..., description="策略标识")
+    natural_language: str = Field(..., description="原始中文输入")
+
+    # DSL 生成
+    dsl: StrategyDSL | None = Field(default=None, description="生成的 DSL")
+    generation_errors: list[str] = Field(default_factory=list)
+
+    # 校验
+    validation: ValidateStrategyResponse | None = Field(default=None)
+    red_line_result: dict[str, Any] = Field(default_factory=dict)
+
+    # Preview
+    preview: PreviewResponse | None = Field(default=None)
+
+    # Light Backtest
+    backtest: BacktestResponse | None = Field(default=None)
+    backtest_mode: Literal["light_stub", "light_mock", "full"] = Field(
+        default="light_stub",
+        description="回测执行模式",
+    )
+
+    # Audit
+    audit_records: list[dict[str, Any]] = Field(default_factory=list)
+
+    # 问题归档
+    problem_items: list[dict[str, Any]] = Field(default_factory=list)
+
+    # 整体状态
+    status: Literal["success", "partial", "failed"] = Field(default="failed")
+    stage_reached: Literal[
+        "generation", "validation", "preview", "backtest", "complete"
+    ] = Field(default="generation", description="执行到的最远距离")
+
+
+# ---------------------------------------------------------------------------
+# NL -> DSL Parser (MVP rule-based, no LLM)
+# ---------------------------------------------------------------------------
+
+class NLToDSLParser:
+    """Rule-based Chinese NL to StrategyDSL parser.
+
+    Supports only the phrases defined in MVP_E2E_SAMPLES_2026_06_08.md Section 5.
+    """
+
+    def __init__(self) -> None:
+        pass
+
+    def parse(self, natural_language: str, strategy_id: str) -> StrategyDSL:
+        """Parse Chinese natural language to StrategyDSL.
+
+        Raises:
+            ValueError: If input cannot be parsed or missing mandatory conditions.
+        """
+        nl = natural_language.strip()
+
+        # Extract entry conditions (支持组合条件，用 "且" / "," 分隔)
+        entry: list[ConditionBlock] = []
+
+        # MA golden cross: MA{N}上穿MA{M}
+        for ma_cross_match in re.finditer(r"MA(\d+)上穿MA(\d+)", nl):
+            fast = int(ma_cross_match.group(1))
+            slow = int(ma_cross_match.group(2))
+            entry.append(
+                ConditionBlock(
+                    condition_type="ma_golden_cross",
+                    params={"fast_period": fast, "slow_period": slow},
+                )
+            )
+
+        # State hex in: D1状态属于...
+        state_match = re.search(r"(MN1|W1|D1)状态属于([0-9a-zA-Z、或]+)", nl)
+        if state_match:
+            timeframe = state_match.group(1)
+            values_str = state_match.group(2)
+            values = [v.strip() for v in re.split(r"[、或]", values_str) if v.strip()]
+            entry.append(
+                ConditionBlock(
+                    condition_type="state_hex_in",
+                    params={"timeframe": timeframe, "values": values},
+                )
+            )
+
+        # Volume ratio: 成交量放大到{N}日均量{R}倍以上
+        vol_match = re.search(r"成交量放大到(\d+)日均量([\d.]+)倍以上", nl)
+        if vol_match:
+            lookback = int(vol_match.group(1))
+            ratio = float(vol_match.group(2))
+            entry.append(
+                ConditionBlock(
+                    condition_type="volume_ratio",
+                    params={"lookback": lookback, "operator": ">", "value": ratio},
+                )
+            )
+
+        # State EF count: {TF}状态EF数量{op}{V}
+        ef_match = re.search(r"状态EF数量(不少于|不低于|至少|大于等于|>=|<=|>|<|==|)(\d+)", nl)
+        if ef_match:
+            op_text = ef_match.group(1)
+            op = _normalize_operator(op_text)
+            value = int(ef_match.group(2))
+            entry.append(
+                ConditionBlock(
+                    condition_type="state_ef_count",
+                    params={"operator": op, "value": value},
+                )
+            )
+
+        # Price cross MA (above): 上穿MA{N} (仅当不是 MA交叉的一部分时)
+        # 使用 finditer 获取所有匹配，排除已作为 ma_golden_cross 处理过的
+        ma_cross_ranges = [
+            (m.start(), m.end())
+            for m in re.finditer(r"MA\d+上穿MA\d+", nl)
+        ]
+        for price_above_match in re.finditer(r"上穿MA(\d+)", nl):
+            # 检查是否落在任何 ma_cross_match 范围内
+            pos = price_above_match.start()
+            if any(start <= pos < end for start, end in ma_cross_ranges):
+                continue
+            ma_period = int(price_above_match.group(1))
+            entry.append(
+                ConditionBlock(
+                    condition_type="price_cross_ma",
+                    params={"timeframe": "D1", "ma_period": ma_period, "direction": "above"},
+                )
+            )
+
+        if not entry:
+            raise ValueError(f"无法从输入中提取任何 entry 条件: {nl[:50]}...")
+
+        # Extract exit conditions
+        exit: list[ConditionBlock] = []
+
+        # MA death cross: MA{N}下穿MA{M}
+        ma_death_match = re.search(r"MA(\d+)下穿MA(\d+)", nl)
+        if ma_death_match:
+            fast = int(ma_death_match.group(1))
+            slow = int(ma_death_match.group(2))
+            exit.append(
+                ConditionBlock(
+                    condition_type="ma_death_cross",
+                    params={"fast_period": fast, "slow_period": slow},
+                )
+            )
+
+        # Price cross MA (below): 跌破MA{N}
+        price_below_match = re.search(r"跌破MA(\d+)", nl)
+        if price_below_match:
+            ma_period = int(price_below_match.group(1))
+            exit.append(
+                ConditionBlock(
+                    condition_type="price_cross_ma",
+                    params={"timeframe": "D1", "ma_period": ma_period, "direction": "below"},
+                    logic="or",
+                )
+            )
+
+        # Stop loss: 止损{P}%
+        stop_loss_match = re.search(r"止损([\d.]+)%", nl)
+        if stop_loss_match:
+            value = float(stop_loss_match.group(1)) / 100.0
+            exit.append(
+                ConditionBlock(
+                    condition_type="stop_loss_pct",
+                    params={"value": value},
+                    logic="or",
+                )
+            )
+
+        # Take profit: 止盈{P}%
+        take_profit_match = re.search(r"止盈([\d.]+)%", nl)
+        if take_profit_match:
+            value = float(take_profit_match.group(1)) / 100.0
+            exit.append(
+                ConditionBlock(
+                    condition_type="take_profit_pct",
+                    params={"value": value},
+                    logic="or",
+                )
+            )
+
+        # Filters (default: exclude limit-up)
+        filters: list[ConditionBlock] = []
+        if "排除涨停" in nl or "排除涨停股票" in nl:
+            filters.append(
+                ConditionBlock(
+                    condition_type="limit_up_filter",
+                    params={"allow": False},
+                )
+            )
+        elif "允许涨停" in nl:
+            filters.append(
+                ConditionBlock(
+                    condition_type="limit_up_filter",
+                    params={"allow": True},
+                )
+            )
+        else:
+            # MVP default: exclude limit-up
+            filters.append(
+                ConditionBlock(
+                    condition_type="limit_up_filter",
+                    params={"allow": False},
+                )
+            )
+
+        # Risk config defaults
+        max_position = 0.20
+        position_match = re.search(r"仓位([\d.]+)%", nl)
+        if position_match:
+            max_position = float(position_match.group(1)) / 100.0
+
+        risk_per_trade = 0.02
+        risk_match = re.search(r"单笔风险([\d.]+)%", nl)
+        if risk_match:
+            risk_per_trade = float(risk_match.group(1)) / 100.0
+
+        # 统一使用 model_construct 绕过 Pydantic 约束，让红线检查来处理
+        risk = RiskConfig.model_construct(
+            risk_per_trade=risk_per_trade,
+            max_position_pct=max_position,
+            stop_loss_required=True,
+        )
+
+        return StrategyDSL(
+            strategy_id=strategy_id,
+            name=self._generate_name(nl),
+            description=nl,
+            entry=entry,
+            exit=exit,
+            filters=filters,
+            risk=risk,
+        )
+
+    @staticmethod
+    def _generate_name(nl: str) -> str:
+        """Generate a short strategy name from NL."""
+        if "MA" in nl and "上穿" in nl:
+            return "MA交叉策略"
+        if "状态" in nl and "成交量" in nl:
+            return "状态成交量策略"
+        if "状态" in nl and "EF" in nl:
+            return "MA状态组合策略"
+        return "量化策略"
+
+
+# ---------------------------------------------------------------------------
+# E2E Runner
+# ---------------------------------------------------------------------------
+
+def run_mvp_e2e_sample(
+    natural_language: str,
+    strategy_id: str,
+    *,
+    trace_id: str,
+    audit_db_path: str,
+    storage_db_path: str,
+    preview_data_source: Literal["mock", "duckdb"] = "mock",
+    preview_duckdb_path: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> MvpE2EResult:
+    """执行单个 MVP E2E 样例。
+
+    执行顺序：
+        1. NL -> DSL（模板/规则生成，无 LLM）
+        2. Schema/Pydantic 校验
+        3. 红线检查
+        4. Preview（仅红线通过时）
+        5. Light Backtest（仅红线通过时）
+        6. Audit 记录
+        7. 问题归档（如有）
+
+    失败链路也必须写 audit。例如缺少止损时，写入 generation + validation，
+    不执行 preview/backtest。
+    """
+    result = MvpE2EResult(
+        trace_id=trace_id,
+        strategy_id=strategy_id,
+        natural_language=natural_language,
+    )
+
+    audit_logger = StrategyAuditLogger(audit_db_path)
+    audit_logger.init_schema()
+    storage = StrategyLabStorage(storage_db_path)
+    storage.init_schema()
+
+    parser = NLToDSLParser()
+
+    # ------------------------------------------------------------------
+    # Step 1: Generation
+    # ------------------------------------------------------------------
+    try:
+        dsl = parser.parse(natural_language, strategy_id)
+        result.dsl = dsl
+    except Exception as exc:
+        result.generation_errors.append(str(exc))
+        result.status = "failed"
+        result.stage_reached = "generation"
+        _log_generation(audit_logger, trace_id, strategy_id, natural_language, None, result.generation_errors)
+        result.audit_records = _load_audit_records(audit_logger, trace_id)
+        return result
+
+    _log_generation(audit_logger, trace_id, strategy_id, natural_language, dsl, [])
+
+    # ------------------------------------------------------------------
+    # Step 2: Validation
+    # ------------------------------------------------------------------
+    validation = validate_dsl(dsl)
+    result.validation = _to_validate_response(validation, trace_id)
+    result.red_line_result = {
+        "passed": not validation.has_red_line_violation,
+        "triggered_rules": [
+            e.code for e in validation.errors if e.level == ValidationLevel.RED_LINE
+        ],
+    }
+
+    _log_validation(
+        audit_logger, trace_id, strategy_id, dsl, validation, result.red_line_result
+    )
+
+    if not validation.passed:
+        result.status = "failed"
+        result.stage_reached = "validation"
+        _archive_problems(result, validation)
+        result.audit_records = _load_audit_records(audit_logger, trace_id)
+        return result
+
+    storage.save_strategy_version(
+        strategy_id=strategy_id,
+        dsl=dsl.to_dict(),
+        trace_id=trace_id,
+        input_hash=_hash_payload({"natural_language": natural_language}),
+        output_hash=_hash_payload(dsl.to_dict()),
+    )
+
+    # ------------------------------------------------------------------
+    # Step 3: Preview
+    # ------------------------------------------------------------------
+    preview_service = PreviewService(
+        PreviewConfig(duckdb_path=preview_duckdb_path)
+    )
+    try:
+        preview = preview_service.preview(
+            dsl, data_source=preview_data_source, trace_id=trace_id
+        )
+        result.preview = preview
+    except Exception as exc:
+        result.preview = None
+        result.problem_items.append(
+            {
+                "sample_id": strategy_id,
+                "category": "implementation",
+                "stage": "preview",
+                "summary": f"Preview execution failed: {exc}",
+                "evidence": {"error": str(exc)},
+                "owner": "codex",
+                "next_action": "Investigate preview service error",
+            }
+        )
+
+    _log_preview(audit_logger, trace_id, strategy_id, dsl, result.preview, result.red_line_result)
+
+    if result.preview is None or result.preview.overall.overall_status == "failed":
+        result.status = "failed"
+        result.stage_reached = "preview"
+        result.audit_records = _load_audit_records(audit_logger, trace_id)
+        return result
+
+    # ------------------------------------------------------------------
+    # Step 4: Light Backtest
+    # ------------------------------------------------------------------
+    bt_start = start_date or "2023-01-01"
+    bt_end = end_date or "2024-12-31"
+
+    try:
+        bt_result = run_dsl_backtest(dsl, bt_start, bt_end)
+        metrics = BacktestMetrics(
+            total_return=bt_result.metrics.get("total_return"),
+            annual_return=bt_result.metrics.get("annual_return"),
+            sharpe_ratio=bt_result.metrics.get("sharpe_ratio"),
+            max_drawdown=bt_result.metrics.get("max_drawdown"),
+            profit_factor=bt_result.metrics.get("profit_factor"),
+            trade_count=bt_result.metrics.get("trade_count"),
+            total_trades=bt_result.metrics.get("trade_count"),
+            win_rate=bt_result.metrics.get("win_rate"),
+        )
+        bt_status: Literal["success", "partial", "failed"] = (
+            "partial" if bt_result.risk_flags else "success"
+        )
+        result.backtest = BacktestResponse(
+            trace_id=trace_id,
+            status=bt_status,
+            metrics=metrics,
+            errors=bt_result.risk_flags,
+        )
+        result.backtest_mode = "light_stub"
+
+        # Persist
+        metrics_dict = dict(bt_result.metrics)
+        metrics_dict["_mode"] = "light_stub"
+        storage.save_backtest_result(
+            strategy_id=strategy_id,
+            trace_id=trace_id,
+            status=bt_status,
+            metrics=metrics_dict,
+            dsl_snapshot=dsl.to_dict(),
+        )
+    except Exception as exc:
+        result.backtest = BacktestResponse(
+            trace_id=trace_id,
+            status="failed",
+            errors=[f"Backtest execution failed: {exc}"],
+        )
+        result.backtest_mode = "light_stub"
+        result.problem_items.append(
+            {
+                "sample_id": strategy_id,
+                "category": "implementation",
+                "stage": "backtest",
+                "summary": f"Backtest execution failed: {exc}",
+                "evidence": {"error": str(exc)},
+                "owner": "codex",
+                "next_action": "Investigate backtest adapter error",
+            }
+        )
+        _log_backtest(audit_logger, trace_id, strategy_id, dsl, result.backtest, result.red_line_result)
+        result.status = "failed"
+        result.stage_reached = "backtest"
+        result.audit_records = _load_audit_records(audit_logger, trace_id)
+        return result
+
+    _log_backtest(audit_logger, trace_id, strategy_id, dsl, result.backtest, result.red_line_result)
+
+    # ------------------------------------------------------------------
+    # Step 5: Finalize
+    # ------------------------------------------------------------------
+    result.status = "success" if not result.backtest.errors else "partial"
+    result.stage_reached = "complete"
+
+    # Load audit records for response
+    result.audit_records = _load_audit_records(audit_logger, trace_id)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Audit Helpers
+# ---------------------------------------------------------------------------
+
+def _log_generation(
+    logger: StrategyAuditLogger,
+    trace_id: str,
+    strategy_id: str,
+    natural_language: str,
+    dsl: StrategyDSL | None,
+    errors: list[str],
+) -> None:
+    input_payload = {"natural_language": natural_language}
+    output_payload = dsl.to_dict() if dsl else {"errors": errors}
+    logger.log_generation(
+        trace_id=trace_id,
+        strategy_id=strategy_id,
+        dsl_version="strategy_dsl_v2",
+        input_payload=input_payload,
+        output_payload=output_payload,
+        red_line_result=None,
+    )
+
+
+def _log_validation(
+    logger: StrategyAuditLogger,
+    trace_id: str,
+    strategy_id: str,
+    dsl: StrategyDSL,
+    validation: Any,
+    red_line_result: dict[str, Any],
+) -> None:
+    input_payload = dsl.to_dict()
+    output_payload = {
+        "passed": validation.passed,
+        "level": validation.level.value,
+        "error_count": validation.error_count,
+        "warning_count": validation.warning_count,
+    }
+    logger.log_validation(
+        trace_id=trace_id,
+        strategy_id=strategy_id,
+        dsl_version="strategy_dsl_v2",
+        input_payload=input_payload,
+        output_payload=output_payload,
+        red_line_result=red_line_result,
+    )
+
+
+def _log_preview(
+    logger: StrategyAuditLogger,
+    trace_id: str,
+    strategy_id: str,
+    dsl: StrategyDSL,
+    preview: PreviewResponse | None,
+    red_line_result: dict[str, Any] | None = None,
+) -> None:
+    input_payload = dsl.to_dict()
+    output_payload = preview.model_dump(mode="json") if preview else {}
+    logger.log_preview(
+        trace_id=trace_id,
+        strategy_id=strategy_id,
+        dsl_version="strategy_dsl_v2",
+        input_payload=input_payload,
+        output_payload=output_payload,
+        red_line_result=red_line_result or {},
+    )
+
+
+def _log_backtest(
+    logger: StrategyAuditLogger,
+    trace_id: str,
+    strategy_id: str,
+    dsl: StrategyDSL,
+    backtest: BacktestResponse | None,
+    red_line_result: dict[str, Any] | None = None,
+) -> None:
+    input_payload = dsl.to_dict()
+    output_payload = backtest.model_dump(mode="json") if backtest else {}
+    logger.log_backtest(
+        trace_id=trace_id,
+        strategy_id=strategy_id,
+        dsl_version="strategy_dsl_v2",
+        input_payload=input_payload,
+        output_payload=output_payload,
+        red_line_result=red_line_result or {},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Conversion Helpers
+# ---------------------------------------------------------------------------
+
+def _to_validate_response(validation: Any, trace_id: str) -> ValidateStrategyResponse:
+    """Convert internal ValidationResult to API response model."""
+    return ValidateStrategyResponse(
+        trace_id=trace_id,
+        passed=validation.passed,
+        level=validation.level.value,
+        errors=[
+            ValidationErrorItem(
+                level=e.level.value,
+                code=e.code,
+                message=e.message,
+                path=e.path,
+            )
+            for e in validation.errors
+        ],
+        warnings=[
+            ValidationErrorItem(
+                level=w.level.value,
+                code=w.code,
+                message=w.message,
+                path=w.path,
+            )
+            for w in validation.warnings
+        ],
+        red_line_result={
+            "passed": not validation.has_red_line_violation,
+            "triggered_rules": [
+                e.code for e in validation.errors if e.level == ValidationLevel.RED_LINE
+            ],
+            "details": [
+                e.detail for e in validation.errors if e.level == ValidationLevel.RED_LINE
+            ],
+        },
+    )
+
+
+def _archive_problems(result: MvpE2EResult, validation: Any) -> None:
+    """Archive validation failures as problem items."""
+    for error in validation.errors:
+        category = "definition" if error.level in (ValidationLevel.STRUCTURE, ValidationLevel.SEMANTIC) else "acceptance"
+        if error.level == ValidationLevel.RED_LINE:
+            category = "definition"
+        result.problem_items.append(
+            {
+                "sample_id": result.strategy_id,
+                "category": category,
+                "stage": "validation",
+                "summary": error.message,
+                "evidence": {
+                    "code": error.code,
+                    "path": error.path,
+                    "detail": error.detail,
+                },
+                "owner": "codex",
+                "next_action": "Fix DSL or adjust NL input",
+            }
+        )
+
+
+def _normalize_operator(op_text: str) -> str:
+    """Normalize supported Chinese comparison phrases to registry operators."""
+    mapping = {
+        "不少于": ">=",
+        "不低于": ">=",
+        "至少": ">=",
+        "大于等于": ">=",
+        "": ">=",
+    }
+    return mapping.get(op_text, op_text)
+
+
+def _hash_payload(payload: dict[str, Any]) -> str:
+    data = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(data.encode("utf-8")).hexdigest()[:16]
+
+
+def _load_audit_records(
+    audit_logger: StrategyAuditLogger, trace_id: str
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "trace_id": r.trace_id,
+            "operation": r.operation,
+            "strategy_id": r.strategy_id,
+            "dsl_version": r.dsl_version,
+            "input_hash": r.input_hash,
+            "output_hash": r.output_hash,
+            "red_line_result": r.red_line_result,
+            "created_at": r.created_at,
+        }
+        for r in audit_logger.list_by_trace_id(trace_id)
+    ]

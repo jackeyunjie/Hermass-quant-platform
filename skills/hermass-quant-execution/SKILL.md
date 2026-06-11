@@ -49,3 +49,14 @@ Every implementation pass should produce:
 - Validation performed.
 - Remaining risk.
 - Next step.
+
+## MVP Acceptance Command
+
+Run the sample-level Strategy Lab acceptance when changing the MVP chain:
+
+```bash
+/Users/lv111101/.pyenv/versions/3.11.12/bin/python scripts/run_strategy_lab_mvp_e2e_acceptance.py
+```
+
+The command must pass 3 valid frozen samples and 2 red-line failure samples.
+It writes JSON/DuckDB evidence under `outputs/strategy_lab/`.

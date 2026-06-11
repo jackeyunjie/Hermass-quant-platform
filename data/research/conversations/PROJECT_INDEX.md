@@ -13,6 +13,7 @@
 - [[decisions/0007-factor-library-expansion-direction]]
 - [[decisions/0008-broad-factor-source-evidence-governance]]
 - [[decisions/0009-factor-catalog-registry-accepted]]：Codex 对 Kimi 因子目录和 Qoder Registry 规格的采纳裁决，不是提示词。
+- [[decisions/0010-external-service-readiness]]：当前只允许邀请制研究试点，不允许公开商业化、投资建议、真实交易或收益承诺。
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
@@ -29,8 +30,15 @@
 - `hermass_platform/factors/`
 - `config/factors/`
 - `data/research/conversations/agent-runs/2026-06-07-qoder-phase1-duckdb-preview-storage-audit.md`
+- `data/research/conversations/agent-runs/2026-06-09-codex-mvp-e2e-acceptance-script.md`
+- `data/research/conversations/agent-runs/2026-06-11-codex-assign-kimi-github-obsidian-sync.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-github-obsidian-sync-discipline.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-external-service-readiness-pilot.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-github-stars-growth-plan.md`
+- `data/research/conversations/agent-runs/2026-06-11-codex-github-maturity-p0.md`
 - `hermass_platform/strategy_lab/storage.py`
 - `hermass_platform/strategy_lab/audit.py`
+- `scripts/run_strategy_lab_mvp_e2e_acceptance.py`
 
 ## Next Agent Prompts
 
@@ -49,6 +57,11 @@
 - `agents/KIMI_NEXT_TASK_F1_FACTOR_FORMULA_CONTRACTS.md`
 - `agents/QODER_NEXT_TASK_FACTOR_REGISTRY_IMPLEMENTATION_PATCH.md`
 - `agents/QODER_NEXT_TASK_PHASE1_DUCKDB_PREVIEW_STORAGE_AUDIT.md`
+- `agents/KIMI_NEXT_TASK_PRODUCT_SCOPE_SERVICE_BOUNDARY.md`
+- `agents/KIMI_NEXT_TASK_GITHUB_OBSIDIAN_SYNC_DISCIPLINE.md`
+- `agents/KIMI_NEXT_TASK_EXTERNAL_SERVICE_READINESS_PILOT.md`
+- `agents/KIMI_NEXT_TASK_GITHUB_STARS_GROWTH_PLAN.md`
+- `agents/KIMI2_NEXT_TASK_DATA_REFRESH_REPLACEMENT_AUDIT.md`
 
 ## 当前目标
 

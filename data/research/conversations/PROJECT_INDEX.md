@@ -15,6 +15,7 @@
 - [[decisions/0009-factor-catalog-registry-accepted]]：Codex 对 Kimi 因子目录和 Qoder Registry 规格的采纳裁决，不是提示词。
 - [[decisions/0010-external-service-readiness]]：当前只允许邀请制研究试点，不允许公开商业化、投资建议、真实交易或收益承诺。
 - [[decisions/0011-trade-evidence-database]]：新增交易摘要与交易事件证据库，用于记录进场/出场多周期状态、指标快照和触发条件。
+- [[decisions/0012-phase2-light-backtest-contract]]：采纳 Qoder 的 `light_real_v1` 回测模块合同和 Kimi 的真实数据/性能门禁。
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
@@ -68,6 +69,12 @@
 - `agents/KIMI_NEXT_TASK_SOFT_LAUNCH_READINESS_OUTREACH_PACK.md`
 - `agents/QODER_NEXT_TASK_TRADE_EVIDENCE_BACKTEST_CONTRACT.md`
 - `agents/KIMI_NEXT_TASK_TRADE_EVIDENCE_DATABASE_PERFORMANCE.md`
+- `agents/QODER_NEXT_TASK_PHASE2_LIGHT_BACKTEST_CONTRACT.md`
+- `agents/KIMI_NEXT_TASK_PHASE2_REAL_DATA_PERF_GATES.md`
+- `data/research/conversations/agent-runs/2026-06-11-codex-phase2-light-backtest-dispatch.md`
+- `data/research/conversations/agent-runs/2026-06-11-qoder-phase2-light-backtest-contract.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-phase2-real-data-perf-gates.md`
+- `data/research/conversations/agent-runs/2026-06-11-codex-phase2-real-data-perf-gates.md`
 
 ## 当前目标
 

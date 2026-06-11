@@ -24,7 +24,7 @@ def _generate_daily_bars(symbols: int, days: int, seed: int = 42) -> pl.DataFram
 
     # Generate date list (calendar days for simplicity)
     start = datetime(2024, 1, 1)
-    date_list = [(start + timedelta(days=d)).strftime("%Y-%m-%d") for d in range(days)]
+    date_list = [(start + timedelta(days=d)).date() for d in range(days)]
 
     # Build grid
     df = (
@@ -118,7 +118,7 @@ def _generate_state_cube(symbols: int, days: int, seed: int = 43) -> pl.DataFram
     rng = random.Random(seed)
     sym_list = [f"SYM{i:04d}" for i in range(symbols)]
     start = datetime(2024, 1, 1)
-    date_list = [(start + timedelta(days=d)).strftime("%Y-%m-%d") for d in range(days)]
+    date_list = [(start + timedelta(days=d)).date() for d in range(days)]
     states = ["1A", "1B", "2A", "2B", "3A", "3B", "4A", "4B"]
     extra_states = ["1A", "2A", "3A", "4A"]
 

@@ -6,11 +6,12 @@
 
 | 文件 | 说明 |
 |------|------|
-| `validate_real_data.py` | 数据体检：验证 Foundation DB 和 State Cube 的表、列、索引、行数 |
+| `validate_real_data.py` | 数据体检：验证 Foundation DB 和 State Cube 的表、列、索引、行数、类型、唯一键、 freshness、metadata、state alias |
 | `light_backtest_perf.py` | Light Backtest `full_polars` vs `filter_first`，含分阶段计时 |
 | `indicator_precompute_vs_compute.py` | 预计算 `ma_20` 读取 vs 窗口函数实时计算 |
 | `duckdb_vs_polars.py` | DuckDB-only 简单信号 vs DuckDB 取数 + Polars 计算 |
 | `state_cube_query.py` | State Cube 无缓存 / 列裁剪 / LRU 缓存查询对比 |
+| `gate_summary.py` | 读取 validation JSON + benchmark JSONL，输出 Phase 2 hot-path gate PASS/FAIL |
 | `_synthetic.py` | Synthetic 数据生成器（setup 用，允许循环） |
 
 ## 统一 CLI 参数
@@ -34,12 +35,31 @@
 /Users/lv111101/.pyenv/versions/3.11.12/bin/python benchmarks/validate_real_data.py \
   --foundation-db data/p116_foundation.duckdb \
   --state-cube-db data/state_cube.duckdb \
+  --min-symbols 5000 \
+  --min-trading-days 252 \
+  --max-staleness-days 30 \
+  --as-of-date $(date +%Y-%m-%d) \
   --output outputs/benchmarks/real_data_validation_$(date +%Y%m%d).json
 ```
 
 - `ok=true` 时才能将 benchmark 结果作为 Phase 2 验收依据。
 - `ok=false` 时修复数据后再跑 benchmark。
 - 缺失 DB 或 schema 不完整时脚本仍会写出 JSON，但进程退出码为 1，这是预期行为。
+
+### Gate Summary
+
+在真实数据 benchmark 跑完后，生成门禁汇总：
+
+```bash
+/Users/lv111101/.pyenv/versions/3.11.12/bin/python benchmarks/gate_summary.py \
+  --validation outputs/benchmarks/real_data_validation_$(date +%Y%m%d).json \
+  --benchmark outputs/benchmarks/light_backtest_real_$(date +%Y%m%d).jsonl \
+  --output outputs/benchmarks/gate_summary_$(date +%Y%m%d).json
+```
+
+- 输出 `ok=true/false` 和每个 gate 的 `pass/fail`。
+- 不指定 `--validation` / `--benchmark` 时会自动查找最新的 `outputs/benchmarks/real_data_validation_*.json` 和 `outputs/benchmarks/light_backtest_real_*.jsonl`。
+- 进程退出码 `0` 表示所有 gate 通过，`1` 表示至少一个失败。
 
 ## 运行方式
 

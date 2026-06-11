@@ -14,6 +14,7 @@
 - [[decisions/0008-broad-factor-source-evidence-governance]]
 - [[decisions/0009-factor-catalog-registry-accepted]]：Codex 对 Kimi 因子目录和 Qoder Registry 规格的采纳裁决，不是提示词。
 - [[decisions/0010-external-service-readiness]]：当前只允许邀请制研究试点，不允许公开商业化、投资建议、真实交易或收益承诺。
+- [[decisions/0011-trade-evidence-database]]：新增交易摘要与交易事件证据库，用于记录进场/出场多周期状态、指标快照和触发条件。
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
@@ -39,6 +40,8 @@
 - `hermass_platform/strategy_lab/storage.py`
 - `hermass_platform/strategy_lab/audit.py`
 - `scripts/run_strategy_lab_mvp_e2e_acceptance.py`
+- `docs/strategy_lab/TRADE_EVIDENCE_DATABASE_DESIGN.md`
+- `data/research/conversations/decisions/0011-trade-evidence-database.md`
 
 ## Next Agent Prompts
 
@@ -62,6 +65,9 @@
 - `agents/KIMI_NEXT_TASK_EXTERNAL_SERVICE_READINESS_PILOT.md`
 - `agents/KIMI_NEXT_TASK_GITHUB_STARS_GROWTH_PLAN.md`
 - `agents/KIMI2_NEXT_TASK_DATA_REFRESH_REPLACEMENT_AUDIT.md`
+- `agents/KIMI_NEXT_TASK_SOFT_LAUNCH_READINESS_OUTREACH_PACK.md`
+- `agents/QODER_NEXT_TASK_TRADE_EVIDENCE_BACKTEST_CONTRACT.md`
+- `agents/KIMI_NEXT_TASK_TRADE_EVIDENCE_DATABASE_PERFORMANCE.md`
 
 ## 当前目标
 

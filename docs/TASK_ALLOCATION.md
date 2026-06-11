@@ -415,6 +415,54 @@ Codex 判断：
 任务文件：
 - `agents/KIMI2_NEXT_TASK_DATA_REFRESH_REPLACEMENT_AUDIT.md`
 
+### K13: GitHub 软启动准备度复核与首批传播包
+
+Codex 判断：
+- GitHub P0 成熟化已完成并推送：README、Apache-2.0 LICENSE、Topics、Description、examples、Issue templates、CONTRIBUTING 均已落地。
+- 当前 stars 仍为 `0`，下一步不应直接 public launch，应先做私域/熟人软启动复核。
+- KIMI2 数据审计尚未完成，因此任何传播都必须继续标注 `light_stub`，不能宣称真实回测能力。
+
+交付：
+- `agents/KIMI_NEXT_TASK_SOFT_LAUNCH_READINESS_OUTREACH_PACK.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-soft-launch-readiness-outreach-pack.md`
+
+验收：
+- 给出 soft launch readiness verdict：`NOT_READY` / `PRIVATE_SOFT_LAUNCH_READY` / `PUBLIC_SOFT_LAUNCH_READY` / `PUBLIC_LAUNCH_READY`。
+- 复核 README、Quickstart、License、Description、Topics、examples、Issue templates、CONTRIBUTING、disclaimer 和 `light_stub` 标注。
+- 定义本轮软启动边界：允许触达谁、不允许触达谁、可以说什么、不能说什么。
+- 输出首批 20 人目标人群模板，不包含真实个人隐私。
+- 输出中文/英文私信、朋友圈、X/LinkedIn、GitHub pinned issue 等合规文案。
+- 给出 7 天反馈收集计划、成功标准、停止标准和红旗反馈。
+- 输出软启动前后 Codex 工程 backlog，包括 demo、release、CI、badge、SECURITY.md 等。
+- 按 K10 同步纪律输出 GitHub / Obsidian handoff。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_SOFT_LAUNCH_READINESS_OUTREACH_PACK.md`
+
+### K14: 交易证据大数据库性能与聚合方案
+
+Codex 判断：
+- 策略大数据库必须先从交易证据库开始，记录每笔交易 entry/hold/exit 的多周期状态、指标快照和触发条件。
+- 当前最小 storage schema 已落地，但大规模查询、JSON 展开、物化视图和聚合方案需要 Kimi 评估。
+
+交付：
+- `agents/KIMI_NEXT_TASK_TRADE_EVIDENCE_DATABASE_PERFORMANCE.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-trade-evidence-database-performance.md`
+
+验收：
+- 给出 1 万、10 万、100 万、1000 万事件规模假设。
+- 定义按 strategy/trace/state/condition/indicator 查询的 P50/P95 目标。
+- 比较 JSON 保留、宽表展开、物化视图的取舍。
+- 给出 DuckDB/Polars 分工、索引、分区和 benchmark 脚本建议。
+- 明确 Phase 2 / Phase 3 落地顺序。
+
+状态：新增任务。
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_TRADE_EVIDENCE_DATABASE_PERFORMANCE.md`
+
 ## Codex 任务
 
 ### C1: 项目协作资产
@@ -673,6 +721,29 @@ Codex 判断：
 - Strategy Lab tests：198 passed, 1 warning。
 - E2E acceptance：5/5 cases passed。
 - Example DSL tests：1 passed, 1 warning。
+
+### C16: 交易证据库 MVP
+
+交付：
+- `docs/strategy_lab/TRADE_EVIDENCE_DATABASE_DESIGN.md`
+- `data/research/conversations/decisions/0011-trade-evidence-database.md`
+- `hermass_platform/strategy_lab/storage.py`
+- `hermass_platform/strategy_lab/tests/test_storage.py`
+- `agents/QODER_NEXT_TASK_TRADE_EVIDENCE_BACKTEST_CONTRACT.md`
+- `agents/KIMI_NEXT_TASK_TRADE_EVIDENCE_DATABASE_PERFORMANCE.md`
+
+验收：
+- 新增 `strategy_trades` 和 `strategy_trade_events` 表。
+- 支持保存交易摘要。
+- 支持保存 entry/exit/hold 事件证据。
+- 事件证据能保存多周期 state、指标快照和触发条件 JSON。
+- 支持按 `strategy_id` / `trace_id` 查询交易，按 `trade_id` 查询事件。
+
+状态：新增并实现最小 schema，待复核。
+
+下一轮任务：
+- Qoder 设计真实 Light Backtest 写入交易证据的接口契约。
+- Kimi 设计交易证据大数据库性能与聚合方案。
 
 ### C3: Phase 1 API 与预览
 

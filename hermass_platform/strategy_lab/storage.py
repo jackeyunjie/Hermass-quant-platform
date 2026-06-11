@@ -4,6 +4,8 @@ Tables:
     user_strategies      - strategy identity and latest metadata
     strategy_versions    - every DSL snapshot with hashes
     strategy_backtests   - backtest results linked to versions
+    strategy_trades      - normalized trade-level records
+    strategy_trade_events - entry/exit/hold evidence snapshots per trade
 """
 
 from __future__ import annotations
@@ -38,6 +40,45 @@ class BacktestResult:
     status: str
     metrics: dict[str, Any]
     dsl_snapshot: dict[str, Any] | None
+    created_at: str = ""
+
+
+@dataclass
+class TradeRecord:
+    """A normalized trade record linked to strategy and trace evidence."""
+
+    trade_id: str
+    strategy_id: str
+    trace_id: str
+    symbol: str
+    side: str
+    status: str
+    entry_time: str
+    entry_price: float | None = None
+    exit_time: str | None = None
+    exit_price: float | None = None
+    quantity: float | None = None
+    pnl: float | None = None
+    pnl_pct: float | None = None
+    created_at: str = ""
+
+
+@dataclass
+class TradeEventEvidence:
+    """State and indicator evidence captured at entry/exit/hold events."""
+
+    trade_id: str
+    strategy_id: str
+    trace_id: str
+    symbol: str
+    event_type: str
+    event_time: str
+    price: float | None
+    timeframe_states: dict[str, Any]
+    indicator_snapshot: dict[str, Any]
+    triggered_conditions: list[dict[str, Any]]
+    notes: str = ""
+    event_id: int | None = None
     created_at: str = ""
 
 
@@ -105,6 +146,49 @@ class StrategyLabStorage:
                 metrics JSON NOT NULL,
                 dsl_snapshot JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (strategy_id) REFERENCES user_strategies(strategy_id)
+            )
+            """
+        )
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS strategy_trades (
+                trade_id VARCHAR PRIMARY KEY,
+                strategy_id VARCHAR NOT NULL,
+                trace_id VARCHAR NOT NULL,
+                symbol VARCHAR NOT NULL,
+                side VARCHAR NOT NULL,
+                status VARCHAR NOT NULL,
+                entry_time TIMESTAMP NOT NULL,
+                entry_price DOUBLE,
+                exit_time TIMESTAMP,
+                exit_price DOUBLE,
+                quantity DOUBLE,
+                pnl DOUBLE,
+                pnl_pct DOUBLE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (strategy_id) REFERENCES user_strategies(strategy_id)
+            )
+            """
+        )
+        con.execute(
+            """
+            CREATE SEQUENCE IF NOT EXISTS seq_trade_event_id START 1;
+            CREATE TABLE IF NOT EXISTS strategy_trade_events (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_trade_event_id'),
+                trade_id VARCHAR NOT NULL,
+                strategy_id VARCHAR NOT NULL,
+                trace_id VARCHAR NOT NULL,
+                symbol VARCHAR NOT NULL,
+                event_type VARCHAR NOT NULL,
+                event_time TIMESTAMP NOT NULL,
+                price DOUBLE,
+                timeframe_states JSON NOT NULL,
+                indicator_snapshot JSON NOT NULL,
+                triggered_conditions JSON NOT NULL,
+                notes VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (trade_id) REFERENCES strategy_trades(trade_id),
                 FOREIGN KEY (strategy_id) REFERENCES user_strategies(strategy_id)
             )
             """
@@ -221,3 +305,198 @@ class StrategyLabStorage:
             dsl_snapshot=json.loads(row[4]) if row[4] else None,
             created_at=str(row[5]) if row[5] else "",
         )
+
+    def save_trade_record(
+        self,
+        *,
+        trade_id: str,
+        strategy_id: str,
+        trace_id: str,
+        symbol: str,
+        side: str,
+        status: str,
+        entry_time: str,
+        entry_price: float | None = None,
+        exit_time: str | None = None,
+        exit_price: float | None = None,
+        quantity: float | None = None,
+        pnl: float | None = None,
+        pnl_pct: float | None = None,
+    ) -> None:
+        """Persist or update a normalized trade record.
+
+        Trade records are intentionally separate from event snapshots. A trade
+        can have one entry event, zero or more hold/snapshot events, and one
+        exit event.
+        """
+        con = self._connect()
+        con.execute(
+            """
+            INSERT INTO strategy_trades
+                (trade_id, strategy_id, trace_id, symbol, side, status,
+                 entry_time, entry_price, exit_time, exit_price, quantity, pnl, pnl_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (trade_id) DO UPDATE SET
+                strategy_id = EXCLUDED.strategy_id,
+                trace_id = EXCLUDED.trace_id,
+                symbol = EXCLUDED.symbol,
+                side = EXCLUDED.side,
+                status = EXCLUDED.status,
+                entry_time = EXCLUDED.entry_time,
+                entry_price = EXCLUDED.entry_price,
+                exit_time = EXCLUDED.exit_time,
+                exit_price = EXCLUDED.exit_price,
+                quantity = EXCLUDED.quantity,
+                pnl = EXCLUDED.pnl,
+                pnl_pct = EXCLUDED.pnl_pct
+            """,
+            [
+                trade_id,
+                strategy_id,
+                trace_id,
+                symbol,
+                side,
+                status,
+                entry_time,
+                entry_price,
+                exit_time,
+                exit_price,
+                quantity,
+                pnl,
+                pnl_pct,
+            ],
+        )
+
+    def save_trade_event_evidence(
+        self,
+        *,
+        trade_id: str,
+        strategy_id: str,
+        trace_id: str,
+        symbol: str,
+        event_type: str,
+        event_time: str,
+        price: float | None,
+        timeframe_states: dict[str, Any],
+        indicator_snapshot: dict[str, Any],
+        triggered_conditions: list[dict[str, Any]],
+        notes: str = "",
+    ) -> None:
+        """Persist entry/exit/hold evidence with state and indicator snapshots."""
+        con = self._connect()
+        con.execute(
+            """
+            INSERT INTO strategy_trade_events
+                (trade_id, strategy_id, trace_id, symbol, event_type, event_time, price,
+                 timeframe_states, indicator_snapshot, triggered_conditions, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                trade_id,
+                strategy_id,
+                trace_id,
+                symbol,
+                event_type,
+                event_time,
+                price,
+                json.dumps(
+                    timeframe_states,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                json.dumps(
+                    indicator_snapshot,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                json.dumps(
+                    triggered_conditions,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                notes,
+            ],
+        )
+
+    def list_trades(
+        self,
+        *,
+        strategy_id: str | None = None,
+        trace_id: str | None = None,
+    ) -> list[TradeRecord]:
+        """List trade records filtered by strategy_id or trace_id."""
+        con = self._connect()
+        sql = """
+            SELECT trade_id, strategy_id, trace_id, symbol, side, status,
+                   entry_time, entry_price, exit_time, exit_price, quantity,
+                   pnl, pnl_pct, created_at
+            FROM strategy_trades
+        """
+        clauses: list[str] = []
+        params: list[str] = []
+        if strategy_id is not None:
+            clauses.append("strategy_id = ?")
+            params.append(strategy_id)
+        if trace_id is not None:
+            clauses.append("trace_id = ?")
+            params.append(trace_id)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY entry_time ASC, trade_id ASC"
+
+        rows = con.execute(sql, params).fetchall()
+        return [
+            TradeRecord(
+                trade_id=r[0],
+                strategy_id=r[1],
+                trace_id=r[2],
+                symbol=r[3],
+                side=r[4],
+                status=r[5],
+                entry_time=str(r[6]) if r[6] else "",
+                entry_price=r[7],
+                exit_time=str(r[8]) if r[8] else None,
+                exit_price=r[9],
+                quantity=r[10],
+                pnl=r[11],
+                pnl_pct=r[12],
+                created_at=str(r[13]) if r[13] else "",
+            )
+            for r in rows
+        ]
+
+    def list_trade_events(self, trade_id: str) -> list[TradeEventEvidence]:
+        """List entry/exit/hold evidence snapshots for a trade."""
+        con = self._connect()
+        rows = con.execute(
+            """
+            SELECT id, trade_id, strategy_id, trace_id, symbol, event_type,
+                   event_time, price, timeframe_states, indicator_snapshot,
+                   triggered_conditions, notes, created_at
+            FROM strategy_trade_events
+            WHERE trade_id = ?
+            ORDER BY event_time ASC, id ASC
+            """,
+            [trade_id],
+        ).fetchall()
+        return [
+            TradeEventEvidence(
+                event_id=r[0],
+                trade_id=r[1],
+                strategy_id=r[2],
+                trace_id=r[3],
+                symbol=r[4],
+                event_type=r[5],
+                event_time=str(r[6]) if r[6] else "",
+                price=r[7],
+                timeframe_states=json.loads(r[8]),
+                indicator_snapshot=json.loads(r[9]),
+                triggered_conditions=json.loads(r[10]),
+                notes=r[11] or "",
+                created_at=str(r[12]) if r[12] else "",
+            )
+            for r in rows
+        ]

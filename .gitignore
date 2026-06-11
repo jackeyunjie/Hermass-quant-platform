@@ -32,3 +32,6 @@ outputs/
 data/research/conversations/.obsidian/workspace*.json
 data/research/conversations/daily/
 data/research/conversations/web-clips/
+
+# Qoder tool artifacts
+.qoder/

@@ -32,6 +32,7 @@ from .condition_registry import (
 from .condition_translator import translate_condition
 from .dsl_schema import ConditionBlock, StrategyDSL
 from .dsl_validator import ValidationLevel, validate_dsl
+from ._duckdb_helper import connect_duckdb
 
 
 # ---------------------------------------------------------------------------
@@ -54,9 +55,7 @@ class DuckDBPreviewProvider:
             return self._con
         if self.duckdb_path is None:
             raise RuntimeError("duckdb_path not configured")
-        import duckdb
-
-        self._con = duckdb.connect(self.duckdb_path)
+        self._con = connect_duckdb(self.duckdb_path)
         return self._con
 
     def count_hits(

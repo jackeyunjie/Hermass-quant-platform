@@ -6,7 +6,11 @@ Provides:
     - Condition Translator (DSL -> DuckDB SQL / Polars)
     - DSL Validator (semantic + red-line validation)
     - DSL Generator (LLM output -> DSL conversion, stub)
-    - Backtest Adapter (DSL -> BacktestConfig, stub)
+    - Backtest Adapter (DSL -> BacktestConfig, Phase 2 real light engine)
+    - Light Backtest Engine (Polars hot path)
+    - Backtest Data Provider (DuckDB data loading)
+    - Backtest Metrics (performance metric computation)
+    - Backtest Evidence (trade record and event evidence construction)
 """
 
 from .dsl_schema import (
@@ -42,6 +46,18 @@ from .dsl_validator import (
     ValidationWarning,
     validate_dsl,
 )
+from .backtest_models import (
+    EquityPoint,
+    LightBacktestOutput,
+    MarketDataBundle,
+    MarketDataRequest,
+    SignalFrame,
+    TradeSummary,
+)
+from .backtest_data_provider import DuckDBBacktestDataProvider
+from .light_backtest_engine import LightBacktestEngine
+from .backtest_metrics import compute_light_metrics
+from .backtest_evidence import build_trade_event_evidence, build_trade_records
 
 __all__ = [
     # Schema
@@ -73,4 +89,17 @@ __all__ = [
     "DSLValidationResult",
     "ValidationWarning",
     "validate_dsl",
+    # Backtest Models
+    "EquityPoint",
+    "LightBacktestOutput",
+    "MarketDataBundle",
+    "MarketDataRequest",
+    "SignalFrame",
+    "TradeSummary",
+    # Backtest Engine
+    "DuckDBBacktestDataProvider",
+    "LightBacktestEngine",
+    "compute_light_metrics",
+    "build_trade_event_evidence",
+    "build_trade_records",
 ]

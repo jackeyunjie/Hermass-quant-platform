@@ -28,6 +28,7 @@ from .api_models import (
 )
 from .audit import StrategyAuditLogger
 from .backtest_adapter import run_dsl_backtest
+from .backtest_evidence import build_trade_event_evidence, build_trade_records
 from .dsl_schema import ConditionBlock, RiskConfig, StrategyDSL
 from .dsl_validator import ValidationLevel, validate_dsl
 from .preview_service import PreviewConfig, PreviewService
@@ -60,7 +61,7 @@ class MvpE2EResult(BaseModel):
 
     # Light Backtest
     backtest: BacktestResponse | None = Field(default=None)
-    backtest_mode: Literal["light_stub", "light_mock", "full"] = Field(
+    backtest_mode: Literal["light_stub", "light_real_v1", "light_mock", "full"] = Field(
         default="light_stub",
         description="回测执行模式",
     )
@@ -304,6 +305,9 @@ def run_mvp_e2e_sample(
     preview_duckdb_path: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    foundation_db: str | None = None,
+    state_cube_db: str | None = None,
+    universe: list[str] | None = None,
 ) -> MvpE2EResult:
     """执行单个 MVP E2E 样例。
 
@@ -418,8 +422,20 @@ def run_mvp_e2e_sample(
     bt_start = start_date or "2023-01-01"
     bt_end = end_date or "2024-12-31"
 
+    from pathlib import Path as _Path
+
+    _foundation_db = _Path(foundation_db) if foundation_db else None
+
     try:
-        bt_result = run_dsl_backtest(dsl, bt_start, bt_end)
+        bt_result = run_dsl_backtest(
+            dsl,
+            bt_start,
+            bt_end,
+            foundation_db=_foundation_db,
+            state_cube_db=_Path(state_cube_db) if state_cube_db else None,
+            universe=universe,
+            trace_id=trace_id,
+        )
         metrics = BacktestMetrics(
             total_return=bt_result.metrics.get("total_return"),
             annual_return=bt_result.metrics.get("annual_return"),
@@ -427,23 +443,42 @@ def run_mvp_e2e_sample(
             max_drawdown=bt_result.metrics.get("max_drawdown"),
             profit_factor=bt_result.metrics.get("profit_factor"),
             trade_count=bt_result.metrics.get("trade_count"),
-            total_trades=bt_result.metrics.get("trade_count"),
+            total_trades=bt_result.metrics.get("total_trades", bt_result.metrics.get("trade_count")),
             win_rate=bt_result.metrics.get("win_rate"),
+            avg_holding_days=bt_result.metrics.get("avg_holding_days"),
+            turnover=bt_result.metrics.get("turnover"),
+            cost_total=bt_result.metrics.get("cost_total"),
         )
         bt_status: Literal["success", "partial", "failed"] = (
-            "partial" if bt_result.risk_flags else "success"
+            "failed" if bt_result.status == "failed"
+            else "partial" if bt_result.risk_flags
+            else "success"
         )
+        bt_mode = bt_result.mode or "light_stub"
+
         result.backtest = BacktestResponse(
             trace_id=trace_id,
             status=bt_status,
+            mode=bt_mode,
             metrics=metrics,
-            errors=bt_result.risk_flags,
+            risk_flags=bt_result.risk_flags,
+            warnings=bt_result.warnings,
+            trade_count=bt_result.metrics.get("trade_count"),
+            daily_curve=bt_result.daily_curve[:100] if bt_result.daily_curve else [],
+            trades=bt_result.trades[:100] if bt_result.trades else [],
+            data_version=bt_result.data_version,
+            elapsed_seconds=bt_result.elapsed_seconds,
+            errors=bt_result.risk_flags + bt_result.warnings,
+            daily_curve_total_count=len(bt_result.daily_curve) if bt_result.daily_curve else 0,
+            trades_truncated=len(bt_result.trades) > 100 if bt_result.trades else False,
         )
-        result.backtest_mode = "light_stub"
+        result.backtest_mode = bt_mode
 
-        # Persist
+        # Persist backtest result
         metrics_dict = dict(bt_result.metrics)
-        metrics_dict["_mode"] = "light_stub"
+        metrics_dict["_mode"] = bt_mode
+        if bt_result.warnings:
+            metrics_dict["data_quality_warnings"] = bt_result.warnings
         storage.save_backtest_result(
             strategy_id=strategy_id,
             trace_id=trace_id,
@@ -451,13 +486,24 @@ def run_mvp_e2e_sample(
             metrics=metrics_dict,
             dsl_snapshot=dsl.to_dict(),
         )
+
+        # Persist trade records and events (real mode only)
+        if bt_mode == "light_real_v1" and bt_result.trades:
+            _persist_trades_and_events(
+                storage=storage,
+                bt_result=bt_result,
+                dsl=dsl,
+                trace_id=trace_id,
+                strategy_id=strategy_id,
+            )
     except Exception as exc:
         result.backtest = BacktestResponse(
             trace_id=trace_id,
             status="failed",
+            mode="light_stub" if not foundation_db else "light_real_v1",
             errors=[f"Backtest execution failed: {exc}"],
         )
-        result.backtest_mode = "light_stub"
+        result.backtest_mode = "light_stub" if not foundation_db else "light_real_v1"
         result.problem_items.append(
             {
                 "sample_id": strategy_id,
@@ -480,13 +526,76 @@ def run_mvp_e2e_sample(
     # ------------------------------------------------------------------
     # Step 5: Finalize
     # ------------------------------------------------------------------
-    result.status = "success" if not result.backtest.errors else "partial"
+    result.status = "success" if not result.backtest.risk_flags else "partial"
     result.stage_reached = "complete"
 
     # Load audit records for response
     result.audit_records = _load_audit_records(audit_logger, trace_id)
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Trade Persistence
+# ---------------------------------------------------------------------------
+
+def _persist_trades_and_events(
+    *,
+    storage: StrategyLabStorage,
+    bt_result: Any,
+    dsl: StrategyDSL,
+    trace_id: str,
+    strategy_id: str,
+) -> None:
+    """Persist trade records and event evidence for real light backtest.
+
+    Uses the completed signal_frame from the engine (via BacktestResult.signal_frame)
+    to build trade records and event evidence. Falls back to the trades list
+    when signal_frame is not available (e.g., stub or older backtest results).
+    """
+    signal_frame = getattr(bt_result, "signal_frame", None)
+
+    if signal_frame is not None and hasattr(signal_frame, "is_empty"):
+        if not signal_frame.is_empty():
+            trade_records = build_trade_records(signal_frame, dsl, trace_id)
+            for rec in trade_records:
+                try:
+                    storage.save_trade_record(**rec)
+                except Exception:
+                    pass
+
+            events = build_trade_event_evidence(signal_frame, dsl, trace_id)
+            for evt in events:
+                try:
+                    storage.save_trade_event_evidence(**evt)
+                except Exception:
+                    pass
+            return
+
+    # Fallback: persist trades from bt_result.trades list (light_stub or legacy)
+    if bt_result.trades:
+        for trade in bt_result.trades:
+            trade_id = trade.get("trade_id", "")
+            if not trade_id:
+                continue
+            try:
+                storage.save_trade_record(
+                    trade_id=trade_id,
+                    strategy_id=strategy_id,
+                    trace_id=trace_id,
+                    symbol=trade.get("symbol", ""),
+                    side=trade.get("side", "long"),
+                    status="closed" if trade.get("exit_date") else "open",
+                    entry_time=trade.get("entry_date", ""),
+                    entry_price=trade.get("entry_price"),
+                    exit_time=trade.get("exit_date"),
+                    exit_price=trade.get("exit_price"),
+                    quantity=trade.get("shares"),
+                    pnl=trade.get("pnl"),
+                    pnl_pct=trade.get("pnl_pct"),
+                )
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------

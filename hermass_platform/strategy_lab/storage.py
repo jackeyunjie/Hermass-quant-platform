@@ -14,6 +14,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from ._duckdb_helper import connect_duckdb
+
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -96,9 +98,7 @@ class StrategyLabStorage:
     def _connect(self):
         if self._con is not None:
             return self._con
-        import duckdb
-
-        self._con = duckdb.connect(self.db_path)
+        self._con = connect_duckdb(self.db_path)
         return self._con
 
     def close(self) -> None:
@@ -284,6 +284,32 @@ class StrategyLabStorage:
             for r in rows
         ]
 
+    def get_strategy_version_by_trace_id(
+        self, trace_id: str
+    ) -> StrategyVersion | None:
+        """Retrieve the strategy version associated with a trace_id."""
+        con = self._connect()
+        row = con.execute(
+            """
+            SELECT strategy_id, dsl, trace_id, input_hash, output_hash, created_at
+            FROM strategy_versions
+            WHERE trace_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            [trace_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return StrategyVersion(
+            strategy_id=row[0],
+            dsl=json.loads(row[1]),
+            trace_id=row[2],
+            input_hash=row[3],
+            output_hash=row[4],
+            created_at=str(row[5]) if row[5] else "",
+        )
+
     def get_backtest(self, trace_id: str) -> BacktestResult | None:
         """Retrieve a backtest by trace_id."""
         con = self._connect()
@@ -468,20 +494,88 @@ class StrategyLabStorage:
             for r in rows
         ]
 
-    def list_trade_events(self, trade_id: str) -> list[TradeEventEvidence]:
-        """List entry/exit/hold evidence snapshots for a trade."""
+    def list_backtests(
+        self,
+        *,
+        strategy_id: str | None = None,
+        trace_id: str | None = None,
+    ) -> list[BacktestResult]:
+        """List backtest results, optionally filtered by strategy_id or trace_id."""
         con = self._connect()
-        rows = con.execute(
-            """
-            SELECT id, trade_id, strategy_id, trace_id, symbol, event_type,
-                   event_time, price, timeframe_states, indicator_snapshot,
-                   triggered_conditions, notes, created_at
-            FROM strategy_trade_events
-            WHERE trade_id = ?
-            ORDER BY event_time ASC, id ASC
-            """,
-            [trade_id],
-        ).fetchall()
+        sql = """
+            SELECT strategy_id, trace_id, status, metrics, dsl_snapshot, created_at
+            FROM strategy_backtests
+        """
+        clauses: list[str] = []
+        params: list[str] = []
+        if strategy_id is not None:
+            clauses.append("strategy_id = ?")
+            params.append(strategy_id)
+        if trace_id is not None:
+            clauses.append("trace_id = ?")
+            params.append(trace_id)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY created_at DESC"
+
+        rows = con.execute(sql, params).fetchall()
+        return [
+            BacktestResult(
+                strategy_id=r[0],
+                trace_id=r[1],
+                status=r[2],
+                metrics=json.loads(r[3]),
+                dsl_snapshot=json.loads(r[4]) if r[4] else None,
+                created_at=str(r[5]) if r[5] else "",
+            )
+            for r in rows
+        ]
+
+    def list_trade_events(
+        self,
+        trade_id: str | None = None,
+        *,
+        trace_id: str | None = None,
+    ) -> list[TradeEventEvidence]:
+        """List entry/exit/hold evidence snapshots for a trade or trace.
+
+        Args:
+            trade_id: Filter by trade_id (legacy positional support).
+            trace_id: Filter by trace_id.
+
+        Raises:
+            ValueError: If both trade_id and trace_id are provided, or neither.
+        """
+        if trade_id is not None and trace_id is not None:
+            raise ValueError("Provide either trade_id or trace_id, not both")
+        if trade_id is None and trace_id is None:
+            raise ValueError("Provide either trade_id or trace_id")
+
+        con = self._connect()
+        if trade_id is not None:
+            rows = con.execute(
+                """
+                SELECT id, trade_id, strategy_id, trace_id, symbol, event_type,
+                       event_time, price, timeframe_states, indicator_snapshot,
+                       triggered_conditions, notes, created_at
+                FROM strategy_trade_events
+                WHERE trade_id = ?
+                ORDER BY event_time ASC, id ASC
+                """,
+                [trade_id],
+            ).fetchall()
+        else:
+            rows = con.execute(
+                """
+                SELECT id, trade_id, strategy_id, trace_id, symbol, event_type,
+                       event_time, price, timeframe_states, indicator_snapshot,
+                       triggered_conditions, notes, created_at
+                FROM strategy_trade_events
+                WHERE trace_id = ?
+                ORDER BY event_time ASC, id ASC
+                """,
+                [trace_id],
+            ).fetchall()
         return [
             TradeEventEvidence(
                 event_id=r[0],

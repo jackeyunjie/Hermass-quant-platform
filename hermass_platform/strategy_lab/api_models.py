@@ -255,10 +255,31 @@ class BacktestRequest(BaseModel):
         default_factory=lambda: str(uuid4()),
         description="Unique trace ID for audit trail",
     )
+    mode: Literal["light"] = Field(
+        default="light",
+        description="Backtest execution mode",
+    )
+    initial_capital: float = Field(
+        default=1_000_000.0,
+        gt=0,
+        description="Starting portfolio value",
+    )
+    foundation_db: str | None = Field(
+        default=None,
+        description="Path to foundation DuckDB (injected by service layer)",
+    )
+    state_cube_db: str | None = Field(
+        default=None,
+        description="Path to state cube DuckDB (injected by service layer)",
+    )
+    universe: list[str] | None = Field(
+        default=None,
+        description="Optional list of symbols to backtest",
+    )
 
 
 class BacktestMetrics(BaseModel):
-    """Core backtest metrics (stub)."""
+    """Core backtest metrics."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -270,6 +291,9 @@ class BacktestMetrics(BaseModel):
     trade_count: int | None = Field(default=None)
     total_trades: int | None = Field(default=None)
     win_rate: float | None = Field(default=None)
+    avg_holding_days: float | None = Field(default=None)
+    turnover: float | None = Field(default=None)
+    cost_total: float | None = Field(default=None)
 
 
 class BacktestResponse(BaseModel):
@@ -280,10 +304,29 @@ class BacktestResponse(BaseModel):
     trace_id: str = Field(...)
     dsl_version: str = Field(default="strategy_dsl_v2")
     status: Literal["success", "partial", "failed"] = Field(default="failed")
+    mode: Literal["light_real_v1", "light_stub"] = Field(default="light_real_v1")
     metrics: BacktestMetrics = Field(default_factory=BacktestMetrics)
+    risk_flags: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    trade_count: int | None = Field(default=None)
+    daily_curve: list[dict[str, Any]] = Field(default_factory=list)
+    trades: list[dict[str, Any]] = Field(default_factory=list)
+    state_breakdown: dict[str, Any] = Field(default_factory=dict)
+    data_version: str | None = Field(default=None)
+    elapsed_seconds: float | None = Field(default=None)
     errors: list[str] = Field(default_factory=list)
     input_hash: str = Field(default="")
     output_hash: str = Field(default="")
+
+    # Truncation metadata (for paginated/truncated responses)
+    daily_curve_total_count: int | None = Field(
+        default=None,
+        description="Total number of daily curve points (may exceed len(daily_curve) if truncated)",
+    )
+    trades_truncated: bool = Field(
+        default=False,
+        description="True when trades list was truncated to the first N entries",
+    )
 
 
 class GetBacktestResponse(BaseModel):

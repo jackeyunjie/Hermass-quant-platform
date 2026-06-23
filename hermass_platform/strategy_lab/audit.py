@@ -11,6 +11,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from ._duckdb_helper import connect_duckdb
+
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -49,9 +51,7 @@ class StrategyAuditLogger:
     def _connect(self):
         if self._con is not None:
             return self._con
-        import duckdb
-
-        self._con = duckdb.connect(self.db_path)
+        self._con = connect_duckdb(self.db_path)
         return self._con
 
     def close(self) -> None:

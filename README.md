@@ -43,10 +43,39 @@ Phase 0/1 MVP is implemented for the Strategy Lab path:
 - Sample-level E2E runner.
 - Acceptance script covering 3 valid samples and 2 red-line failures.
 
+Phase 2 Light Backtest v1 (synthetic integration):
+
+- `light_backtest_engine.py` - Polars vectorized signal computation + trade generation.
+- `backtest_data_provider.py` - DuckDB data loading with column normalization.
+- `backtest_evidence.py` - Trade record and event evidence construction.
+- `backtest_metrics.py` - Performance metrics (sharpe, drawdown, win_rate, etc.).
+- `backtest_adapter.py` - Facade routing to real engine or stub fallback.
+- `e2e_runner.py` - Complete NL→DSL→Validation→Preview→Backtest→Audit pipeline.
+- API truncation metadata (`daily_curve_total_count`, `trades_truncated`).
+- Tradability hardening (limit-down blocked exit → hold evidence).
+
+Phase 2 Hardening (2026-06-19):
+
+- ✅ No silent stub fallback when real DB is missing (returns `BT_DATA_DB_NOT_FOUND`).
+- ✅ Multi-symbol date-level execution semantics (sort: `date ASC, symbol ASC`).
+- ✅ Trade/event evidence E2E persistence via `BacktestResult.signal_frame`.
+- ✅ `volume_ratio OR volume_ma_N` provider alternate group contract.
+
+Phase 3 Web UI (2026-06-19):
+
+- `web/main.py` + `web/strategy_lab_routes.py` - FastAPI + Jinja2 thin layer.
+- Strategy Structuring page: Chinese input → DSL → validation → red-line result.
+- Strategy Diagnosis page: Preview + Light Backtest by trace_id.
+- Evidence Lab page: Audit timeline + trades + trade events by trace_id.
+- Explicit run tags (`synthetic` / `light_stub` / `light_real_v1`) + not-investment-advice disclaimer.
+- Data readiness badge: reads `outputs/benchmarks/data_readiness_status.json` and displays READY / PARTIAL / NOT_READY.
+- Web smoke test: `scripts/test_web_ui_smoke.py`.
+
 Latest local verification:
 
-- Strategy Lab tests: `197 passed, 1 warning`.
+- Strategy Lab tests: `278 passed`.
 - MVP E2E acceptance: `5/5 cases passed`.
+- Web UI smoke test: `5/5 checks passed`.
 
 ## Quickstart
 
@@ -77,6 +106,14 @@ Validate example DSL files:
 ```bash
 python3 -m pytest hermass_platform/strategy_lab/tests/test_examples.py -q
 ```
+
+Run the Web UI locally:
+
+```bash
+python3 -m uvicorn web.main:app --reload --port 8000
+```
+
+Then open http://localhost:8000 and navigate through Strategy Structuring / Diagnosis / Evidence Lab.
 
 The acceptance script writes local evidence under `outputs/strategy_lab/`. The `outputs/` directory is intentionally ignored by Git.
 
@@ -194,10 +231,10 @@ Key modules:
 
 | Phase | Goal | Status |
 | --- | --- | --- |
-| Phase 0 | DSL schema, condition registry, red-line validation | Implemented |
-| Phase 1 | Preview, storage, audit, sample E2E runner | Implemented |
-| Phase 2 | Real Light Backtest with DuckDB + Polars | Planned |
-| Phase 3 | Web UI, richer factor/block library, industry-chain agent | Planned |
+| Phase 0 | DSL schema, condition registry, red-line validation | ✅ Implemented |
+| Phase 1 | Preview, storage, audit, sample E2E runner | ✅ Implemented |
+| Phase 2 | Real Light Backtest with DuckDB + Polars | ✅ Synthetic integration (blockers resolved) |
+| Phase 3 | Web UI, richer factor/block library, industry-chain agent | ✅ Web UI implemented (Jinja2/FastAPI); factor library & industry-chain agent planned |
 
 The current default route is MVP first. Full Agent Debate, Paper Trading, TS-FM, and RAG-KG remain research backlog items.
 

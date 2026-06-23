@@ -16,6 +16,10 @@
 - [[decisions/0010-external-service-readiness]]：当前只允许邀请制研究试点，不允许公开商业化、投资建议、真实交易或收益承诺。
 - [[decisions/0011-trade-evidence-database]]：新增交易摘要与交易事件证据库，用于记录进场/出场多周期状态、指标快照和触发条件。
 - [[decisions/0012-phase2-light-backtest-contract]]：采纳 Qoder 的 `light_real_v1` 回测模块合同和 Kimi 的真实数据/性能门禁。
+- [[decisions/0013-vision-milestones-key-assumptions]]：参考 S 级私董会，将 Hermass 定义为分层策略研究共同体与 AI 量化研究操作系统。
+- [[decisions/0014-phase2-light-backtest-implemented]]：Phase 2 Light Backtest 实现落地，5 个新模块 + 78 个新测试，278 全量通过。
+- [[decisions/0015-state-cube-architectural-positioning]]：State Cube 作为应用层与风控层核心，建立在更广泛数据基座之上。
+- [[decisions/0016-phase3-web-ui-real-baseline-split]]：Phase 3 Web UI 与真实数据 baseline 拆分为并行任务，Web 层 FastAPI + Jinja2，不阻塞真实数据准备。
 - [[project-docs/final-implementation-plan-summary]]
 - [[skills/skill-iteration-log]]
 - [[agent-runs/README]]
@@ -75,6 +79,29 @@
 - `data/research/conversations/agent-runs/2026-06-11-qoder-phase2-light-backtest-contract.md`
 - `data/research/conversations/agent-runs/2026-06-11-kimi-phase2-real-data-perf-gates.md`
 - `data/research/conversations/agent-runs/2026-06-11-codex-phase2-real-data-perf-gates.md`
+- `data/research/conversations/agent-runs/2026-06-11-codex-phase2-light-backtest-implementation-review.md`
+- `agents/KIMI_NEXT_TASK_PHASE2_REAL_DB_BASELINE_RUN.md`
+- `agents/QODER_NEXT_TASK_PHASE2_LIGHT_BACKTEST_HARDENING_REVIEW.md`
+- `data/research/conversations/agent-runs/2026-06-11-codex-phase2-real-baseline-hardening-dispatch.md`
+- `data/research/conversations/agent-runs/2026-06-11-kimi-phase2-real-db-baseline-run.md`
+- `data/research/conversations/agent-runs/2026-06-11-qoder-phase2-light-backtest-hardening-review.md`
+- `data/research/conversations/agent-runs/2026-06-18-codex-state-cube-architecture-audit.md`
+- `data/research/conversations/agent-runs/2026-06-19-codex-phase3-web-ui-implementation.md`
+- `data/research/conversations/agent-runs/2026-06-19-codex-web-ui-data-readiness-badge.md`
+- `docs/product/VISION_MILESTONES_AND_KEY_ASSUMPTIONS.md`
+- `data/research/conversations/decisions/0013-vision-milestones-key-assumptions.md`
+- `data/research/conversations/agent-runs/2026-06-11-qoder-phase2-light-backtest-implemented.md`
+- `data/research/conversations/decisions/0014-phase2-light-backtest-implemented.md`
+- `hermass_platform/strategy_lab/backtest_models.py`
+- `hermass_platform/strategy_lab/backtest_data_provider.py`
+- `hermass_platform/strategy_lab/light_backtest_engine.py`
+- `hermass_platform/strategy_lab/backtest_metrics.py`
+- `hermass_platform/strategy_lab/backtest_evidence.py`
+- `hermass_platform/strategy_lab/tests/test_backtest_data_provider.py`
+- `hermass_platform/strategy_lab/tests/test_light_backtest_engine.py`
+- `hermass_platform/strategy_lab/tests/test_backtest_metrics.py`
+- `hermass_platform/strategy_lab/tests/test_backtest_evidence.py`
+- `hermass_platform/strategy_lab/tests/test_real_light_backtest_integration.py`
 
 ## 当前目标
 

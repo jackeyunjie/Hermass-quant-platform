@@ -220,18 +220,16 @@
 - 能指导 Codex 在 `p116_foundation.duckdb` 和 `state_cube.duckdb` 就绪后跑出真实基线。
 - 明确 synthetic smoke 与 real benchmark 的区别。
 
-状态：新增任务。
-
-下一轮任务：
-- `agents/KIMI_NEXT_TASK_REAL_DATA_BENCHMARK_RUNBOOK.md`
+状态：已完成 runbook，已演进为 Phase 3 handoff。
 
 状态更新：
 - Kimi 已完成 runbook，文件：`data/research/conversations/agent-runs/2026-06-06-kimi-real-data-benchmark-runbook.md`。
 - Codex 采纳 Hot Path Gates 作为 Phase 2 性能验收基线。
 - 后续需实现 `benchmarks/validate_real_data.py`，并改进 benchmark 分阶段计时、`--symbols/--days/--runs` 参数。
+- 已演进为 Phase 3 真实数据 baseline handoff，任务文件：`agents/KIMI_NEXT_TASK_PHASE3_REAL_BASELINE_HANDOFF.md`。
 
-下一轮任务 2：
-- `agents/KIMI_NEXT_TASK_VALIDATE_AND_BENCHMARK_PATCH.md`
+下一轮任务：
+- `agents/KIMI_NEXT_TASK_PHASE3_REAL_BASELINE_HANDOFF.md`
 
 ### K6: 高配因子库研究
 
@@ -410,10 +408,16 @@ Codex 判断：
 - 覆盖数据过旧、未来函数、复权口径、幸存者偏差、停牌退市、行业分类漂移、授权风险和 mock 被误解风险。
 - 按 K10 同步纪律输出 GitHub / Obsidian handoff。
 
-状态：新增任务。
+状态：已完成审计，结论为真实 DB 缺失阻塞 real baseline，不阻塞 MVP/Web UI。
+
+状态更新：
+- Kimi 已完成审计，文件：`data/research/conversations/agent-runs/2026-06-11-kimi2-data-refresh-replacement-audit.md`。
+- 结论：`data/p116_foundation.duckdb` 和 `data/state_cube.duckdb` 均不存在；real baseline 继续阻塞，MVP stub/synthetic path 与 Phase 3 Web UI 不受影响。
+- 已演进为 Phase 3 真实数据 baseline handoff，任务文件：`agents/KIMI_NEXT_TASK_PHASE3_REAL_BASELINE_HANDOFF.md`。
 
 任务文件：
 - `agents/KIMI2_NEXT_TASK_DATA_REFRESH_REPLACEMENT_AUDIT.md`
+- `agents/KIMI_NEXT_TASK_PHASE3_REAL_BASELINE_HANDOFF.md`
 
 ### K13: GitHub 软启动准备度复核与首批传播包
 
@@ -462,6 +466,51 @@ Codex 判断：
 
 任务文件：
 - `agents/KIMI_NEXT_TASK_TRADE_EVIDENCE_DATABASE_PERFORMANCE.md`
+
+### K15: 真实数据下载与 DuckDB 构建
+
+Codex 判断：
+- 前两轮 Kimi 数据审计已确认 `data/p116_foundation.duckdb` 和 `data/state_cube.duckdb` 均不存在。
+- Phase 3 Web UI 已落地，主线已切换到真实数据 baseline handoff。
+- Kimi 本轮必须不再停留在审计/判断，而是实际下载数据、计算指标、构建两个 DuckDB 文件。
+
+交付：
+- `agents/KIMI_NEXT_TASK_DATA_DOWNLOAD_AND_BUILD.md`
+- `data/p116_foundation.duckdb`（不提交 Git）
+- `data/state_cube.duckdb`（不提交 Git）
+- `outputs/benchmarks/data_readiness_status.json`
+- `data/research/conversations/agent-runs/2026-06-19-kimi-data-download-build.md`
+
+验收：
+- 原始行情来源明确（黑狼或 AKShare/baostock 等免费备选），说明复权口径、数据覆盖范围和授权状态。
+- `data/p116_foundation.duckdb` 包含 `daily_bars` 表，至少 5000 标的、252 交易日，必需列全部齐全。
+- `data/state_cube.duckdb` 包含 `state_cube` 表，D1/W1/MN1 state 三周期均可查询。
+- `benchmarks/validate_real_data.py` 通过（exit 0，`ok=true`，`errors=[]`）。
+- `outputs/benchmarks/data_readiness_status.json` verdict 为 `READY` 或给出明确的 `PARTIAL` / `NOT_READY` 原因及 `next_steps`。
+- `light_backtest_perf.py` 和 `gate_summary.py` 通过（若 validation 通过）。
+- 所有产出物均有 handoff 记录。
+
+状态：已完成。
+
+Kimi 交付摘要（2026-06-19）：
+- 数据源：黑狼（Blackwolf），复用 `blackwolf_ashare_daily_mm_format_20180515_20260618.zip`
+- `data/p116_foundation.duckdb`：8,591,347 行，5,536 品种，1964 交易日，2018-05-15 ~ 2026-06-18
+- `data/state_cube.duckdb`：8,591,347 行，5,536 品种
+- `data_readiness_status.json`：verdict=READY，staleness_days=0
+- `validate_real_data.py`：PASS，ok=true，errors=[]
+- `light_backtest_perf`：5000×252 full_polars P50=1.97s，P95=2.12s（远低于 20s gate）
+- `gate_summary`：PASS（8/8 gates）
+- 回归：278 strategy_lab + 7 web_ui_smoke + 8 real_backtest_integration = 293 passed
+
+Codex 集成验证（2026-06-19）：
+- Web UI data_readiness 对接验证通过
+- light_real_v1 默认切换生效：READY 时 diagnosis/evidence 页默认显示 light_real_v1
+- 新增 2 个 smoke 端到端用例：`test_readiness_ready_shows_light_real_v1_on_diagnosis_page`、`test_readiness_not_ready_shows_light_stub_on_diagnosis_page`
+- 全量测试通过：278 + 7 + 8 = 293 passed
+
+任务文件：
+- `agents/KIMI_NEXT_TASK_DATA_DOWNLOAD_AND_BUILD.md`
+- `data/research/conversations/agent-runs/2026-06-19-kimi-data-download-and-build-run.md`
 
 ## Codex 任务
 
@@ -744,6 +793,175 @@ Codex 判断：
 下一轮任务：
 - Qoder 设计真实 Light Backtest 写入交易证据的接口契约。
 - Kimi 设计交易证据大数据库性能与聚合方案。
+
+### C17: Phase 2 Light Backtest 推进派工
+
+交付：
+- `agents/QODER_NEXT_TASK_PHASE2_LIGHT_BACKTEST_CONTRACT.md`
+- `agents/KIMI_NEXT_TASK_PHASE2_REAL_DATA_PERF_GATES.md`
+- `data/research/conversations/agent-runs/2026-06-11-codex-phase2-light-backtest-dispatch.md`
+
+验收：
+- Qoder 输出真实 Light Backtest 的可实现 contract，覆盖模块边界、接口签名、DSL 条件语义、DuckDB/Polars 分工、交易规则、审计/storage 写入和测试清单。
+- Kimi 输出真实数据契约与性能门禁，覆盖 benchmark 能力缺口、`validate_real_data.py` 后续改进、5000 symbols x 252 days hot path gates、数据风险和同步 handoff。
+- Codex 保持 MVP baseline 可运行，并记录当前验收命令。
+
+状态：Qoder/Kimi 已回传，Codex 已采纳为 Phase 2 实现输入。
+
+状态更新：
+- Qoder 已完成 `agents/QODER_NEXT_TASK_PHASE2_LIGHT_BACKTEST_CONTRACT.md` 和 `data/research/conversations/agent-runs/2026-06-11-qoder-phase2-light-backtest-contract.md`。
+- Kimi 已完成 `agents/KIMI_NEXT_TASK_PHASE2_REAL_DATA_PERF_GATES.md` 和 `data/research/conversations/agent-runs/2026-06-11-kimi-phase2-real-data-perf-gates.md`。
+- Codex 裁决：采用 `backtest_adapter.py` facade + `backtest_models.py` / `backtest_data_provider.py` / `light_backtest_engine.py` / `backtest_metrics.py` 的模块拆分；真实回测模式标识固定为 `light_real_v1`。
+- Codex 裁决：Kimi 的 Hot Path Gates 阻塞 Phase 2 real backtest 发布、真实指标试点升级、GitHub 真实指标 demo 和 public beta，但不阻塞 Phase 0/1 mock/stub 验收。
+- Codex 裁决：`state_hex_d1` vs `d1_state` 字段分歧由 Phase 2 provider 做 alias 归一，registry/translator 不在本轮破坏性修改。
+
+下一轮实现任务：
+- Codex 第一批实现 `backtest_models.py`、`backtest_data_provider.py`、`light_backtest_engine.py` 和 synthetic integration fixture。
+- Codex 扩展 `benchmarks/validate_real_data.py` P0 checks，并新增 gate summary。
+- Qoder 后续只审阅 contract 偏差，不扩展 Agent Debate。
+- Kimi 后续只跟进真实 DB baseline 和性能风险，不阻塞 stub MVP。
+
+当前基线：
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/strategy_lab/tests -q`
+- 结果：200 passed, 1 warning。
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python scripts/run_strategy_lab_mvp_e2e_acceptance.py`
+- 结果：5/5 cases passed。
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m py_compile hermass_platform/strategy_lab/*.py benchmarks/*.py`
+- 结果：通过。
+
+实现状态更新：
+- Phase 2 Real Light Backtest 第一版已实现，新增 `backtest_models.py`、`backtest_data_provider.py`、`light_backtest_engine.py`、`backtest_metrics.py`、`backtest_evidence.py`。
+- 已改造 `backtest_adapter.py`、`api_models.py`、`e2e_runner.py`、`storage.py` 和 `__init__.py`。
+- 已新增 provider / engine / metrics / evidence / integration 测试。
+- Codex 复核时补两处 contract 防线：`BacktestAdapter.run_backtest()` 入口强制 `validate_dsl()`，红线失败不读 DuckDB、不写 trades；`DuckDBBacktestDataProvider` 改为白名单列裁剪，不再使用 `SELECT *` 读取行情/状态表。
+- 真实 DB baseline 未运行，原因：当前 workspace 缺少 `data/p116_foundation.duckdb` 和 `data/state_cube.duckdb`。
+
+实现复核命令：
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m pytest hermass_platform/strategy_lab/tests -q`
+- 结果：278 passed, 1 warning。
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python scripts/run_strategy_lab_mvp_e2e_acceptance.py`
+- 结果：5/5 cases passed。
+- `/Users/lv111101/.pyenv/versions/3.11.12/bin/python -m py_compile hermass_platform/strategy_lab/*.py benchmarks/*.py`
+- 结果：通过。
+
+复核记录：
+- `data/research/conversations/agent-runs/2026-06-11-codex-phase2-light-backtest-implementation-review.md`
+
+### C18: Phase 2 Real Baseline 与 Hardening 派工
+
+交付：
+- `agents/KIMI_NEXT_TASK_PHASE2_REAL_DB_BASELINE_RUN.md`
+- `agents/QODER_NEXT_TASK_PHASE2_LIGHT_BACKTEST_HARDENING_REVIEW.md`
+- `data/research/conversations/agent-runs/2026-06-11-codex-phase2-real-baseline-hardening-dispatch.md`
+
+验收：
+- Kimi 输出真实 DB baseline readiness/runbook，明确 `data/p116_foundation.duckdb`、`data/state_cube.duckdb` 是否存在；存在则给出可运行 gate 命令，不存在则给出最小数据准备 handoff。
+- Qoder 输出 Phase 2 Light Backtest hardening review，按 blocker / acceptable / backlog 分类审计当前实现与 contract 的偏差。
+- 两份输出都必须明确不阻塞 MVP stub 链路，不扩展 Agent Debate / Paper Trading / 真实下单。
+
+状态：Kimi/Qoder 已回传，Codex 已采纳为下一轮 hardening 输入。
+
+当前 Codex 裁决：
+- Kimi 下一步只负责真实 DB baseline readiness，不改代码。
+- Qoder 下一步只负责 hardening 审阅与任务清单，不改代码。
+- Codex 暂不启动新的实现，先收敛 review 和真实数据准备状态。
+
+状态更新：
+- Kimi 已完成 `agents/KIMI_NEXT_TASK_PHASE2_REAL_DB_BASELINE_RUN.md` 和 `data/research/conversations/agent-runs/2026-06-11-kimi-phase2-real-db-baseline-run.md`。
+- Kimi 结论：`data/p116_foundation.duckdb` 和 `data/state_cube.duckdb` 均不存在；real baseline 继续阻塞，MVP stub/synthetic path 不受影响。
+- Qoder 已完成 `agents/QODER_NEXT_TASK_PHASE2_LIGHT_BACKTEST_HARDENING_REVIEW.md` 和 `data/research/conversations/agent-runs/2026-06-11-qoder-phase2-light-backtest-hardening-review.md`。
+- Qoder 结论：`light_real_v1` 只可作为 internal synthetic smoke；real baseline release 不可发布，blockers 包括真实 DB 缺失、real mode 缺 DB fallback、日期级多 symbol 执行语义、trade/event evidence 落库、`volume_ratio OR volume_ma_N` 契约和真实 benchmark gate 未跑。
+
+下一轮 Codex hardening 优先级：
+1. real mode 传入不存在 DB 时返回 `light_real_v1 failed`，不得静默 fallback `light_stub`。
+2. 打通 real E2E 的 trade/event evidence 落库。
+3. 修正多 symbol 日期级执行语义。
+4. 闭合 `volume_ratio OR volume_ma_N` provider 契约。
+5. 真实 DB 就绪后再跑 Kimi real baseline gate。
+
+状态更新 (2026-06-19)：
+- Codex 已完成全部 5 个 Qoder hardening blocker 修复：
+  - ✅ Blocker 1: `backtest_adapter.py` - real mode 缺 DB 返回 `BT_DATA_DB_NOT_FOUND` + `status=failed`，不再静默降级。
+  - ✅ Blocker 2: `light_backtest_engine.py` + `backtest_data_provider.py` - 排序改为 `date ASC, symbol ASC`，保证多 symbol 日期级组合权益语义。
+  - ✅ Blocker 3: `backtest_adapter.py` (BacktestResult.signal_frame) + `e2e_runner.py` (_persist_trades_and_events) - trade/event evidence 从 real E2E path 可靠落库。
+  - ✅ Blocker 4: `backtest_data_provider.py` - volume_ma_N 缺失时可用 volume_ratio 替代，两者都缺失才 failed。
+  - ✅ Backlog E: `api_models.py` + `e2e_runner.py` - BacktestResponse 新增 `daily_curve_total_count` 和 `trades_truncated` 截断元数据。
+  - ✅ Backlog F: tradability hardening 已内建于 engine `_generate_trades()` 的 limit_down blocked exit + evidence builder 的 `hold` 事件类型。
+- 附加修复：
+  - `pyproject.toml`: 添加 `[tool.hatch.build.targets.wheel]` 修复 hatchling 构建配置。
+  - `backtest_data_provider.py`: `pl.from_arrow(result.arrow())` → `pl.DataFrame(rows, schema=columns, orient="row")` 消除 pyarrow 依赖。
+- 测试基线：278 passed, 0 failed。E2E acceptance 5/5。
+- 架构审计：Codex 已采纳“State 系统作为应用层与风控层的核心，建立在更广泛的数据基座之上”的结论，并记录为决策 `0015` 和 `docs/design/DATA_FOUNDATION_AND_STATE_CUBE_ARCHITECTURE.md`。
+
+### C19: 愿景、里程碑与关键假设
+
+交付：
+- `docs/product/VISION_MILESTONES_AND_KEY_ASSUMPTIONS.md`
+- `data/research/conversations/decisions/0013-vision-milestones-key-assumptions.md`
+
+验收：
+- 参考 S 级私董会的分层加速场、公共契约、案主机制和长期共同体逻辑。
+- 明确 Hermass 不是荐股、交易、收益承诺工具。
+- 定义 H1/H2/H3/H4 四层策略研究场。
+- 定义 M0-M5 里程碑，并把当前 Phase 2 blockers 纳入现实边界。
+- 定义可验证关键假设和失败信号。
+
+状态：已完成。
+
+### C20: Phase 3 Web UI 与真实数据 Baseline 并行派工
+
+交付：
+- `agents/QODER_NEXT_TASK_PHASE3_WEB_UI_CONTRACT.md`
+- `agents/KIMI_NEXT_TASK_PHASE3_REAL_BASELINE_HANDOFF.md`
+- `data/research/conversations/agent-runs/2026-06-18-codex-phase3-web-ui-dispatch.md`
+- `data/research/conversations/decisions/0016-phase3-web-ui-real-baseline-split.md`
+
+验收：
+- Qoder 输出 Phase 3 Web UI 工程契约，只包含 3 个页面：Strategy Structuring、Strategy Diagnosis、Evidence Lab。
+- Web 技术边界固定为 FastAPI + Jinja2；路由只做参数解析、调用 service、返回模板。
+- 必须复用现有服务契约：`GenerateStrategyRequest/Response`、`ValidateStrategyRequest/Response`、`PreviewRequest/Response`、`BacktestRequest/Response`。
+- UI 必须显式暴露运行标签：`synthetic`、`light_stub`、`light_real_v1`，以及 `not investment advice` 免责声明。
+- UI 验收不依赖真实 DB：3 个冻结中文样例跑通 `generate -> validate -> preview -> backtest`。
+- 缺止损、仓位超过 25% 的 DSL 能在 UI 显示红线拒绝原因。
+- 每一步展示 `trace_id`；Evidence Lab 能按 `trace_id` 拉出 generation / validation / preview / backtest 记录。
+- Qoder 输出文件级 contract：`web/main.py`、`web/strategy_lab_routes.py`、`web/templates/...`、`web/static/...`。
+- Qoder 输出明确 Non-MVP Items：不做 SPA/前后端分离、不做前端状态管理框架、不做 Agent Debate、不做 Paper Trading、不做真正实时行情接入。
+- Kimi 输出真实数据 baseline handoff：校验 `data/p116_foundation.duckdb`、校验 `data/state_cube.duckdb`、跑 `benchmarks/validate_real_data.py`、产出 `outputs/benchmarks/data_readiness_status.json` 和 baseline 结果。
+- Kimi 不碰 Web，不阻塞 Phase 3 Web 开发。
+
+状态：Qoder contract 已回传，Codex 已完成 Phase 3 Web UI 实现。
+
+实现交付：
+- `web/main.py`：FastAPI 入口、静态资源、Jinja2 模板、环境变量配置。
+- `web/strategy_lab_routes.py`：3 个页面的 GET/POST 路由，调用现有 service，不直接读写 DuckDB。
+- `web/templates/base.html/index.html/structuring.html/diagnosis.html/evidence.html`：统一布局 + 3 个页面模板。
+- `web/static/style.css`：最小可用样式。
+- `hermass_platform/strategy_lab/storage.py`：新增 `get_strategy_version_by_trace_id()`，扩展 `list_trade_events()` 支持 `trace_id` 查询。
+- `pyproject.toml`：新增 `jinja2>=3.1`、`python-multipart>=0.0.9`，`packages` 增加 `web`。
+- `scripts/test_web_ui_smoke.py`：基于 FastAPI TestClient 的冒烟测试。
+- `web/data_readiness.py`：只读读取 `outputs/benchmarks/data_readiness_status.json`，缺省返回 NOT_READY。
+
+Data Readiness 展示位：
+- 所有页面顶部 header 显示数据基线 verdict（READY / PARTIAL / NOT_READY）。
+- 首页显示 readiness 中文说明与 next_steps。
+- Web UI 不自行判断 DB 存在性，只读取 Kimi 产出的 JSON；缺失时按 contract 显示 NOT_READY。
+
+实现复核：
+- `uv run pytest hermass_platform/strategy_lab/tests -q` → 278 passed, 0 failed。
+- `uv run python scripts/run_strategy_lab_mvp_e2e_acceptance.py` → 5/5 passed。
+- `uv run python scripts/test_web_ui_smoke.py` → ✅ home page / structuring valid sample / structuring over-position red line / structuring missing stop loss / full journey，全部通过。
+- `uv run python -m py_compile hermass_platform/strategy_lab/*.py web/*.py scripts/test_web_ui_smoke.py` → OK。
+
+启动命令：
+```bash
+uv run uvicorn web.main:app --reload --port 8000
+```
+
+Codex 当前裁决：
+- Phase 3 Web UI 主线已实现；真实数据 baseline 仍为独立 Kimi handoff，不互相阻塞。
+- Web 层是薄层，业务逻辑全部留在 `hermass_platform/strategy_lab/`。
+- 真实 DB 缺失继续阻塞 `light_real_v1` 默认发布和真实指标试点，但不阻塞 Web UI mock/synthetic 验收。
+- Web UI 后续应读取 Kimi 产出的 `data_readiness_status.json`，向用户显示当前真实数据 readiness 状态。
 
 ### C3: Phase 1 API 与预览
 

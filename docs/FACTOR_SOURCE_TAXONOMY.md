@@ -226,8 +226,8 @@ Hermass 处理：
 
 分类：
 
-- State Cube。
-- EF width。
+- State Cube / multi-timeframe state_hex。
+- EF width / EF count。
 - Boundary distance。
 - multi-timeframe resonance。
 - Agent Memory outcome。
@@ -236,8 +236,9 @@ Hermass 处理：
 
 Hermass 处理：
 
-- 作为差异化护城河。
-- 与传统 factor 做组合和对比评估。
+- **State Cube 是应用层与风控层的核心**，不是普通 L0 raw input；必须按 L0.5 State / Regime Layer 独立管理、验证和审计。
+- State / Regime 数据为策略入场、过滤、持仓证据和风险规则提供 regime context。
+- 其他 native source（Agent Memory、产业链传播、用户历史）作为差异化护城河，与传统 factor 做组合和对比评估。
 
 ## Evidence Level
 

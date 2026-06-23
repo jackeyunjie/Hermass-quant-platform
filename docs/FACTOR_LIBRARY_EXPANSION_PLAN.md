@@ -100,15 +100,27 @@
 
 ### L0 Raw Inputs
 
-必须作为底层原始输入：
+必须作为底层原始输入：只包含可直接观测、未经过解释的数据：
 
 - OHLCV：open/high/low/close/volume/amount。
 - 交易状态：停牌、涨跌停、是否 ST、新股天数。
 - 行业/概念：申万/中信行业、概念板块。
-- State Cube：MN1/W1/D1/H4/H1 state、EF 宽度、边界状态。
 - 资金流：主力净流入、大单/中单/小单、主动买卖。
 - 基本面：估值、盈利、成长、质量、杠杆、现金流。
 - 宏观/市场：指数状态、市场宽度、成交额、风险偏好。
+
+### L0.5 State / Regime Layer
+
+State Cube 不是普通原始输入，而是从 L0 计算得到的应用层与风控层核心抽象：
+
+- **来源**：由 OHLCV、预计算指标和 Hermass 状态空间方法推导。
+- **内容**：MN1/W1/D1/H4/H1 state_hex、EF 宽度、EF count、边界距离、多周期共振、regime 分类。
+- **角色**：
+  - 入场 regime filter（`state_hex_in`）。
+  - 量能-状态复合条件（`state_ef_count`）。
+  - 持仓/出场证据中的多周期 state 快照。
+  - Risk Guardian 的 regime-aware 风险判断输入。
+- **约束**：必须独立评估未来函数和 look-ahead 风险；真实数据基线需单独 gate。
 
 ### L1 Technical Factors
 

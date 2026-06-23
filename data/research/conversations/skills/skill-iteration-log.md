@@ -76,6 +76,22 @@
 - `context_requirements` 描述 position/portfolio/market_state 等运行时上下文。
 - `requires_backtest_context` 不等于失败；只在 condition/section 级标记。
 
+## 2026-06-11 Qoder Phase 2 Light Backtest 实现后的 Skill 更新点
+
+`hermass-backtest-mvp` 后续应内置：
+
+- Provider D1 别名归一：`close→close_d1`, `ma_N→ma_N_d1`, `state_hex_d1→d1_state`，查询层屏蔽 timeframe 后缀差异。
+- 行级迭代交易生成：持仓上下文需状态机（entry/exit/hold），Polars 只负责信号层，禁止向量化交易生成。
+- Status 从 `risk_flags` 重新计算，不依赖模型默认值，确保红线结果与运行时一致。
+- Engine 自动补算缺失 MA 列（`compute_required_ma`），避免 provider 层遗漏导致信号丢失。
+- 100 股 lot rounding、同日 exit-first-no-reentry、停牌/涨跌停规则已固化在 engine。
+
+`hermass-quant-execution` 后续应加入：
+
+- 4 层单元测试覆盖：provider(11) + engine(14) + metrics(22) + evidence(23) + integration(8) = 78 个回测测试。
+- Real DB 阻塞条件：`data/p116_foundation.duckdb` 和 `data/state_cube.duckdb` 不存在时，只跑 synthetic smoke，不出 real baseline。
+- Phase 2 hardening backlog 追踪：real mode fallback、multi-symbol 日期语义、trade/event 全链路落库、volume_ratio 契约。
+
 ## 待拆分 Skill
 
 - `hermass-dsl-builder`

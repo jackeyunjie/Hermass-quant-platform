@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Any
 
-from . import strategy_lab_routes
+from . import api_routes, strategy_lab_routes
 from .data_readiness import (
     default_backtest_run_tag,
     load_data_readiness,
@@ -62,6 +62,7 @@ templates = Jinja2Templates(directory=str(templates_dir))
 
 # Routes
 app.include_router(strategy_lab_routes.router)
+app.include_router(api_routes.router)
 
 
 def _readiness_context() -> dict[str, Any]:

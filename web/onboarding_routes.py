@@ -2,6 +2,9 @@
 
 Thin HTTP layer for disclaimer consent and H1/H2/H3 user diagnosis.
 All business logic remains in the strategy_lab package.
+
+Invite-token gate: M3 pilot is limited to 5 users via pre-issued tokens.
+Invalid or missing tokens return 403 without revealing system existence.
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -25,6 +28,43 @@ AUDIT_DB = os.getenv(
     "STRATEGY_LAB_AUDIT_DB",
     "outputs/strategy_lab/web_audit.duckdb",
 )
+
+# ---------------------------------------------------------------------------
+# Invite Token Gate
+# ---------------------------------------------------------------------------
+
+# Comma-separated list of valid invite tokens. If empty, onboarding is open.
+# Example: HERMASS_M3_INVITE_TOKENS="token-alpha,token-beta,token-gamma"
+_INVITE_TOKENS_RAW = os.getenv("HERMASS_M3_INVITE_TOKENS", "")
+VALID_INVITE_TOKENS: set[str] = set()
+if _INVITE_TOKENS_RAW.strip():
+    VALID_INVITE_TOKENS = {t.strip() for t in _INVITE_TOKENS_RAW.split(",") if t.strip()}
+
+# Whether token gate is active (tokens configured and non-empty)
+TOKEN_GATE_ACTIVE: bool = bool(VALID_INVITE_TOKENS)
+
+INVITE_COOKIE_NAME = "hermass_invite_token"
+
+
+def _verify_invite_token(request: Request) -> str:
+    """Return the valid token or raise 403.
+
+    Checks query param ?invite=TOKEN first, then cookie.
+    If gate is inactive (no tokens configured), allows all.
+    """
+    if not TOKEN_GATE_ACTIVE:
+        return ""
+    token = request.query_params.get("invite") or request.cookies.get(INVITE_COOKIE_NAME)
+    if token and token in VALID_INVITE_TOKENS:
+        return token
+    raise HTTPException(status_code=403, detail="Invalid or missing invite token.")
+
+
+def _set_invite_cookie(response: Any, token: str) -> None:
+    """Persist valid invite token in httponly cookie."""
+    if token:
+        response.set_cookie(key=INVITE_COOKIE_NAME, value=token, httponly=True, path="/")
+
 
 CONSENT_VERSION = "m3-pilot-v1"
 
@@ -137,7 +177,8 @@ def _compute_diagnosis(answers: dict[str, str]) -> DiagnosisResult:
 @router.get("/")
 async def disclaimer(request: Request) -> "TemplateResponse":
     """Show the M3 pilot disclaimer/consent form."""
-    return templates.TemplateResponse(
+    token = _verify_invite_token(request)
+    response = templates.TemplateResponse(
         request,
         "onboarding/disclaimer.html",
         {
@@ -146,6 +187,9 @@ async def disclaimer(request: Request) -> "TemplateResponse":
             "consent_version": CONSENT_VERSION,
         },
     )
+    if token:
+        _set_invite_cookie(response, token)
+    return response
 
 
 @router.post("/consent")
@@ -154,9 +198,10 @@ async def consent(
     agreed_items: list[str] = Form(default_factory=list),
 ) -> Any:
     """Record disclaimer consent and redirect to diagnosis."""
+    token = _verify_invite_token(request)
     required = {key for key, _ in DISCLAIMER_ITEMS}
     if not required.issubset(set(agreed_items)):
-        return templates.TemplateResponse(
+        response = templates.TemplateResponse(
             request,
             "onboarding/disclaimer.html",
             {
@@ -167,6 +212,9 @@ async def consent(
             },
             status_code=400,
         )
+        if token:
+            _set_invite_cookie(response, token)
+        return response
 
     trace_id = f"onboarding-{uuid4().hex[:12]}"
     logger = _audit_logger()
@@ -180,12 +228,15 @@ async def consent(
 
     response = RedirectResponse(url="/onboarding/diagnosis", status_code=303)
     response.set_cookie(key="onboarding_trace_id", value=trace_id, httponly=True)
+    if token:
+        _set_invite_cookie(response, token)
     return response
 
 
 @router.get("/diagnosis")
 async def diagnosis_form(request: Request) -> "TemplateResponse":
     """Show the H1/H2/H3 diagnosis questionnaire."""
+    _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
     if not trace_id:
         return RedirectResponse(url="/onboarding/", status_code=303)
@@ -210,6 +261,7 @@ async def diagnosis_submit(
     selected_level: str = Form(""),
 ) -> Any:
     """Compute diagnosis result and redirect to recommendation page."""
+    _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
     if not trace_id:
         return RedirectResponse(url="/onboarding/", status_code=303)
@@ -243,6 +295,7 @@ async def result(
     level: str = "H1",
 ) -> "TemplateResponse":
     """Show the recommended entry point and first-experience guidance."""
+    _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
     level_guides = {
         "H1": {
@@ -297,6 +350,7 @@ async def result(
 @router.get("/not-suitable")
 async def not_suitable(request: Request) -> "TemplateResponse":
     """Show a polite rejection page for users who expect investment advice."""
+    _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
     return templates.TemplateResponse(
         request,
@@ -314,6 +368,7 @@ async def feedback_form(
     day: int = 7,
 ) -> Any:
     """Show the day 7 or day 14 feedback form."""
+    _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
     if not trace_id:
         return RedirectResponse(url="/onboarding/", status_code=303)
@@ -358,6 +413,7 @@ async def feedback_submit(
     free_text: str = Form(""),
 ) -> Any:
     """Record a feedback submission."""
+    _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
     if not trace_id:
         return RedirectResponse(url="/onboarding/", status_code=303)
@@ -424,6 +480,7 @@ async def feedback_summary(
     day: int | None = None,
 ) -> "TemplateResponse":
     """Simple ops summary of feedback submissions (no auth in M3)."""
+    _verify_invite_token(request)
     logger = _audit_logger()
     rows = logger.list_feedback(feedback_day=day, limit=200)
     logger.close()

@@ -362,6 +362,85 @@ def test_onboarding_feedback_summary() -> None:
     assert "H3" in response.text
 
 
+# ---------------------------------------------------------------------------
+# Invite Token Gate Tests
+# ---------------------------------------------------------------------------
+
+
+def test_invite_token_gate_active_blocks_without_token() -> None:
+    """When HERMASS_M3_INVITE_TOKENS is set, missing token returns 403."""
+    with temporary_env(HERMASS_M3_INVITE_TOKENS="alpha,beta,gamma"):
+        # Must re-import to pick up new env var
+        import importlib
+        import web.onboarding_routes as _or
+        importlib.reload(_or)
+
+        # Create a fresh client with the reloaded app
+        from web.main import app as fresh_app
+        tc = TestClient(fresh_app)
+        response = tc.get("/onboarding/")
+        assert response.status_code == 403
+        assert "Invalid or missing invite token" in response.text
+
+
+def test_invite_token_valid_query_param() -> None:
+    """Valid token via ?invite=TOKEN should allow access and set cookie."""
+    with temporary_env(HERMASS_M3_INVITE_TOKENS="alpha,beta,gamma"):
+        import importlib
+        import web.onboarding_routes as _or
+        importlib.reload(_or)
+        # Also reload main so it picks up the reloaded onboarding_routes
+        import web.main as _wm
+        importlib.reload(_wm)
+
+        tc = TestClient(_wm.app)
+        response = tc.get("/onboarding/?invite=alpha")
+        assert response.status_code == 200
+        assert "免责声明" in response.text
+
+        # Cookie should be set; subsequent requests should pass without token
+        # TestClient auto-follows redirects, so /diagnosis (no trace_id) redirects
+        # to /onboarding/ which then returns 200 because cookie has valid token
+        response2 = tc.get("/onboarding/diagnosis", follow_redirects=False)
+        assert response2.status_code == 303
+        assert response2.headers["location"] == "/onboarding/"
+
+        # Follow the redirect manually and verify it lands on disclaimer with 200
+        response3 = tc.get("/onboarding/")
+        assert response3.status_code == 200
+        assert "免责声明" in response3.text
+
+
+def test_invite_token_invalid_returns_403() -> None:
+    """Invalid token should return 403 without revealing system details."""
+    with temporary_env(HERMASS_M3_INVITE_TOKENS="alpha,beta,gamma"):
+        import importlib
+        import web.onboarding_routes as _or
+        importlib.reload(_or)
+        import web.main as _wm
+        importlib.reload(_wm)
+
+        tc = TestClient(_wm.app)
+        response = tc.get("/onboarding/?invite=bad-token")
+        assert response.status_code == 403
+        assert "Invalid or missing invite token" in response.text
+
+
+def test_invite_token_gate_inactive_allows_all() -> None:
+    """When HERMASS_M3_INVITE_TOKENS is empty, onboarding is open."""
+    with temporary_env(HERMASS_M3_INVITE_TOKENS=""):
+        import importlib
+        import web.onboarding_routes as _or
+        importlib.reload(_or)
+        import web.main as _wm
+        importlib.reload(_wm)
+
+        tc = TestClient(_wm.app)
+        response = tc.get("/onboarding/")
+        assert response.status_code == 200
+        assert "免责声明" in response.text
+
+
 if __name__ == "__main__":
     test_home_page()
     print("✅ home page")
@@ -407,5 +486,17 @@ if __name__ == "__main__":
 
     test_onboarding_feedback_summary()
     print("✅ onboarding feedback summary")
+
+    test_invite_token_gate_active_blocks_without_token()
+    print("✅ invite token gate blocks without token")
+
+    test_invite_token_valid_query_param()
+    print("✅ invite token valid via query param")
+
+    test_invite_token_invalid_returns_403()
+    print("✅ invite token invalid returns 403")
+
+    test_invite_token_gate_inactive_allows_all()
+    print("✅ invite token gate inactive allows all")
 
     print("\nAll Web UI smoke tests passed.")

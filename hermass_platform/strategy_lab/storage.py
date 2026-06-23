@@ -447,6 +447,121 @@ class StrategyLabStorage:
             ],
         )
 
+    def save_trade_records_batch(
+        self,
+        records: list[dict[str, Any]],
+    ) -> None:
+        """Batch persist trade records.
+
+        Much faster than row-by-row inserts for large backtests.
+        Falls back to row-by-row on conflict if a single batch fails.
+        """
+        if not records:
+            return
+
+        con = self._connect()
+        sql = """
+            INSERT INTO strategy_trades
+                (trade_id, strategy_id, trace_id, symbol, side, status,
+                 entry_time, entry_price, exit_time, exit_price, quantity, pnl, pnl_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (trade_id) DO UPDATE SET
+                strategy_id = EXCLUDED.strategy_id,
+                trace_id = EXCLUDED.trace_id,
+                symbol = EXCLUDED.symbol,
+                side = EXCLUDED.side,
+                status = EXCLUDED.status,
+                entry_time = EXCLUDED.entry_time,
+                entry_price = EXCLUDED.entry_price,
+                exit_time = EXCLUDED.exit_time,
+                exit_price = EXCLUDED.exit_price,
+                quantity = EXCLUDED.quantity,
+                pnl = EXCLUDED.pnl,
+                pnl_pct = EXCLUDED.pnl_pct
+        """
+        params = [
+            (
+                rec["trade_id"],
+                rec["strategy_id"],
+                rec["trace_id"],
+                rec["symbol"],
+                rec["side"],
+                rec["status"],
+                rec["entry_time"],
+                rec.get("entry_price"),
+                rec.get("exit_time"),
+                rec.get("exit_price"),
+                rec.get("quantity"),
+                rec.get("pnl"),
+                rec.get("pnl_pct"),
+            )
+            for rec in records
+        ]
+        try:
+            con.executemany(sql, params)
+        except Exception:
+            # Fallback: row-by-row to avoid losing all records on one bad row
+            for rec in records:
+                try:
+                    self.save_trade_record(**rec)
+                except Exception:
+                    pass
+
+    def save_trade_event_evidence_batch(
+        self,
+        events: list[dict[str, Any]],
+    ) -> None:
+        """Batch persist trade event evidence."""
+        if not events:
+            return
+
+        con = self._connect()
+        sql = """
+            INSERT INTO strategy_trade_events
+                (trade_id, strategy_id, trace_id, symbol, event_type, event_time, price,
+                 timeframe_states, indicator_snapshot, triggered_conditions, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        params = [
+            (
+                evt["trade_id"],
+                evt["strategy_id"],
+                evt["trace_id"],
+                evt["symbol"],
+                evt["event_type"],
+                evt["event_time"],
+                evt.get("price"),
+                json.dumps(
+                    evt.get("timeframe_states", {}),
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                json.dumps(
+                    evt.get("indicator_snapshot", {}),
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                json.dumps(
+                    evt.get("triggered_conditions", []),
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                evt.get("notes", ""),
+            )
+            for evt in events
+        ]
+        try:
+            con.executemany(sql, params)
+        except Exception:
+            for evt in events:
+                try:
+                    self.save_trade_event_evidence(**evt)
+                except Exception:
+                    pass
+
     def list_trades(
         self,
         *,

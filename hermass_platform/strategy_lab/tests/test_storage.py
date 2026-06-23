@@ -264,3 +264,104 @@ class TestSaveAndRetrieve:
         assert trades[0].status == "closed"
         assert trades[0].exit_price == 19.0
         assert trades[0].pnl_pct == -0.05
+
+    def test_save_trade_records_batch(self, storage: StrategyLabStorage) -> None:
+        storage.save_strategy_version(
+            strategy_id="batch_strategy",
+            dsl={"name": "Batch Strategy"},
+            trace_id="trace-batch",
+            input_hash="in-batch",
+            output_hash="out-batch",
+        )
+        records = [
+            {
+                "trade_id": f"batch-{i:03d}",
+                "strategy_id": "batch_strategy",
+                "trace_id": "trace-batch",
+                "symbol": f"{i:06d}.SZ",
+                "side": "long",
+                "status": "closed",
+                "entry_time": "2026-06-01 09:30:00",
+                "entry_price": 10.0 + i,
+                "exit_time": "2026-06-05 14:55:00",
+                "exit_price": 11.0 + i,
+                "quantity": 1000,
+                "pnl": 100.0 * i,
+                "pnl_pct": 0.01 * i,
+            }
+            for i in range(100)
+        ]
+        storage.save_trade_records_batch(records)
+        trades = storage.list_trades(strategy_id="batch_strategy")
+        assert len(trades) == 100
+        assert trades[0].trade_id == "batch-000"
+        assert trades[-1].trade_id == "batch-099"
+
+    def test_save_trade_records_batch_upsert(self, storage: StrategyLabStorage) -> None:
+        storage.save_strategy_version(
+            strategy_id="batch_upsert_strategy",
+            dsl={"name": "Batch Upsert Strategy"},
+            trace_id="trace-batch-upsert",
+            input_hash="in-batch-upsert",
+            output_hash="out-batch-upsert",
+        )
+        records = [
+            {
+                "trade_id": "batch-upsert-001",
+                "strategy_id": "batch_upsert_strategy",
+                "trace_id": "trace-batch-upsert",
+                "symbol": "000001.SZ",
+                "side": "long",
+                "status": "open",
+                "entry_time": "2026-06-01 09:30:00",
+                "entry_price": 10.0,
+            }
+        ]
+        storage.save_trade_records_batch(records)
+        records[0]["status"] = "closed"
+        records[0]["exit_time"] = "2026-06-05 14:55:00"
+        records[0]["exit_price"] = 11.0
+        storage.save_trade_records_batch(records)
+        trades = storage.list_trades(strategy_id="batch_upsert_strategy")
+        assert len(trades) == 1
+        assert trades[0].status == "closed"
+        assert trades[0].exit_price == 11.0
+
+    def test_save_trade_event_evidence_batch(self, storage: StrategyLabStorage) -> None:
+        storage.save_strategy_version(
+            strategy_id="batch_event_strategy",
+            dsl={"name": "Batch Event Strategy"},
+            trace_id="trace-batch-event",
+            input_hash="in-batch-event",
+            output_hash="out-batch-event",
+        )
+        storage.save_trade_record(
+            trade_id="batch-event-trade",
+            strategy_id="batch_event_strategy",
+            trace_id="trace-batch-event",
+            symbol="000001.SZ",
+            side="long",
+            status="closed",
+            entry_time="2026-06-01 09:30:00",
+        )
+        events = [
+            {
+                "trade_id": "batch-event-trade",
+                "strategy_id": "batch_event_strategy",
+                "trace_id": "trace-batch-event",
+                "symbol": "000001.SZ",
+                "event_type": "entry",
+                "event_time": "2026-06-01 09:30:00",
+                "price": 10.0,
+                "timeframe_states": {"D1": "0x23"},
+                "indicator_snapshot": {"D1": {"close": 10.0}},
+                "triggered_conditions": [],
+                "notes": f"entry {i}",
+            }
+            for i in range(50)
+        ]
+        storage.save_trade_event_evidence_batch(events)
+        stored_events = storage.list_trade_events("batch-event-trade")
+        assert len(stored_events) == 50
+        assert stored_events[0].notes == "entry 0"
+        assert stored_events[-1].notes == "entry 49"

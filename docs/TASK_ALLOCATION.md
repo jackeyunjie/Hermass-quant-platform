@@ -1002,6 +1002,11 @@ Codex 当前裁决：
 - `git log --oneline` → 3 个 commit：onboarding 系统 + invite token gate + invite email template。
 - Token 列表：`VFmDwizfH8kkj3Gz09lq_A`（pilot-01）、`cfIPwHmW0G9rjm4rDQuHBA`（pilot-02）、`AlLg1MjVVC0a6SuY-4EGOA`（pilot-03）、`IjDV09cbRTk_NCw7VKZpXQ`（pilot-04）、`Jlww1D1kOwJEfz4oDSkJgA`（pilot-05）
 
+性能优化更新（2026-06-23）：
+- DSL 端到端 backtest 从 27-32s 优化至 **14-17s**。
+- 关键优化：批量持久化 + `signal_frame` 过滤后 `to_dicts()`。
+- 详细报告：`data/research/conversations/agent-runs/2026-06-23-codex-dsl-e2e-performance-spike.md`。
+
 环境变量配置：
 ```bash
 export HERMASS_M3_INVITE_TOKENS="VFmDwizfH8kkj3Gz09lq_A,cfIPwHmW0G9rjm4rDQuHBA,AlLg1MjVVC0a6SuY-4EGOA,IjDV09cbRTk_NCw7VKZpXQ,Jlww1D1kOwJEfz4oDSkJgA"

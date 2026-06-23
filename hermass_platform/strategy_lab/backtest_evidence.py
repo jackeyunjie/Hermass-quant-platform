@@ -59,7 +59,12 @@ def build_trade_records(
     if missing:
         return records
 
-    rows = signal_frame.to_dicts()
+    # Only process rows that belong to a trade. This avoids converting the
+    # entire multi-million row signal frame into Python dicts.
+    trade_rows = signal_frame.filter(
+        pl.col("trade_id").is_not_null() & (pl.col("trade_id") != "")
+    )
+    rows = trade_rows.to_dicts()
     seen_trade_ids: set[str] = set()
 
     for row in rows:
@@ -138,7 +143,11 @@ def build_trade_event_evidence(
     if missing:
         return events
 
-    rows = signal_frame.to_dicts()
+    # Only process rows that belong to a trade.
+    trade_rows = signal_frame.filter(
+        pl.col("trade_id").is_not_null() & (pl.col("trade_id") != "")
+    )
+    rows = trade_rows.to_dicts()
     seen_entries: set[tuple[str, str]] = set()
     seen_exits: set[tuple[str, str]] = set()
 

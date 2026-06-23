@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 import hashlib
 import json
+import time
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -71,6 +72,12 @@ class MvpE2EResult(BaseModel):
 
     # 问题归档
     problem_items: list[dict[str, Any]] = Field(default_factory=list)
+
+    # 性能剖析（可选）
+    stage_timings: dict[str, float] = Field(
+        default_factory=dict,
+        description="各阶段耗时（秒），仅在 profile=True 时填充",
+    )
 
     # 整体状态
     status: Literal["success", "partial", "failed"] = Field(default="failed")
@@ -308,6 +315,7 @@ def run_mvp_e2e_sample(
     foundation_db: str | None = None,
     state_cube_db: str | None = None,
     universe: list[str] | None = None,
+    profile: bool = False,
 ) -> MvpE2EResult:
     """执行单个 MVP E2E 样例。
 
@@ -328,6 +336,12 @@ def run_mvp_e2e_sample(
         strategy_id=strategy_id,
         natural_language=natural_language,
     )
+    timings: dict[str, float] = {}
+    total_start = time.perf_counter()
+
+    def _tick(label: str) -> None:
+        if profile:
+            timings[label] = time.perf_counter() - total_start
 
     audit_logger = StrategyAuditLogger(audit_db_path)
     audit_logger.init_schema()
@@ -335,6 +349,8 @@ def run_mvp_e2e_sample(
     storage.init_schema()
 
     parser = NLToDSLParser()
+
+    stage_start = time.perf_counter()
 
     # ------------------------------------------------------------------
     # Step 1: Generation
@@ -351,6 +367,8 @@ def run_mvp_e2e_sample(
         return result
 
     _log_generation(audit_logger, trace_id, strategy_id, natural_language, dsl, [])
+    timings["generation"] = time.perf_counter() - stage_start
+    stage_start = time.perf_counter()
 
     # ------------------------------------------------------------------
     # Step 2: Validation
@@ -373,7 +391,12 @@ def run_mvp_e2e_sample(
         result.stage_reached = "validation"
         _archive_problems(result, validation)
         result.audit_records = _load_audit_records(audit_logger, trace_id)
+        if profile:
+            result.stage_timings = timings
         return result
+
+    timings["validation"] = time.perf_counter() - stage_start
+    stage_start = time.perf_counter()
 
     storage.save_strategy_version(
         strategy_id=strategy_id,
@@ -382,6 +405,8 @@ def run_mvp_e2e_sample(
         input_hash=_hash_payload({"natural_language": natural_language}),
         output_hash=_hash_payload(dsl.to_dict()),
     )
+    timings["storage_save_version"] = time.perf_counter() - stage_start
+    stage_start = time.perf_counter()
 
     # ------------------------------------------------------------------
     # Step 3: Preview
@@ -409,11 +434,15 @@ def run_mvp_e2e_sample(
         )
 
     _log_preview(audit_logger, trace_id, strategy_id, dsl, result.preview, result.red_line_result)
+    timings["preview"] = time.perf_counter() - stage_start
+    stage_start = time.perf_counter()
 
     if result.preview is None or result.preview.overall.overall_status == "failed":
         result.status = "failed"
         result.stage_reached = "preview"
         result.audit_records = _load_audit_records(audit_logger, trace_id)
+        if profile:
+            result.stage_timings = timings
         return result
 
     # ------------------------------------------------------------------
@@ -473,6 +502,8 @@ def run_mvp_e2e_sample(
             trades_truncated=len(bt_result.trades) > 100 if bt_result.trades else False,
         )
         result.backtest_mode = bt_mode
+        timings["backtest_engine"] = time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
 
         # Persist backtest result
         metrics_dict = dict(bt_result.metrics)
@@ -486,8 +517,11 @@ def run_mvp_e2e_sample(
             metrics=metrics_dict,
             dsl_snapshot=dsl.to_dict(),
         )
+        timings["backtest_save_result"] = time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
 
         # Persist trade records and events (real mode only)
+        persist_timings: dict[str, float] = {}
         if bt_mode == "light_real_v1" and bt_result.trades:
             _persist_trades_and_events(
                 storage=storage,
@@ -495,7 +529,10 @@ def run_mvp_e2e_sample(
                 dsl=dsl,
                 trace_id=trace_id,
                 strategy_id=strategy_id,
+                timings=persist_timings,
             )
+        timings["backtest_persist_trades"] = time.perf_counter() - stage_start
+        timings.update(persist_timings)
     except Exception as exc:
         result.backtest = BacktestResponse(
             trace_id=trace_id,
@@ -531,6 +568,12 @@ def run_mvp_e2e_sample(
 
     # Load audit records for response
     result.audit_records = _load_audit_records(audit_logger, trace_id)
+    stage_start = time.perf_counter()
+    audit_logger.close()
+    timings["audit_load_close"] = time.perf_counter() - stage_start
+    timings["total"] = time.perf_counter() - total_start
+    if profile:
+        result.stage_timings = timings
 
     return result
 
@@ -546,6 +589,7 @@ def _persist_trades_and_events(
     dsl: StrategyDSL,
     trace_id: str,
     strategy_id: str,
+    timings: dict[str, float] | None = None,
 ) -> None:
     """Persist trade records and event evidence for real light backtest.
 
@@ -553,49 +597,53 @@ def _persist_trades_and_events(
     to build trade records and event evidence. Falls back to the trades list
     when signal_frame is not available (e.g., stub or older backtest results).
     """
+    def _tick(label: str, start: float) -> float:
+        if timings is not None:
+            timings[label] = time.perf_counter() - start
+        return time.perf_counter()
+
     signal_frame = getattr(bt_result, "signal_frame", None)
 
     if signal_frame is not None and hasattr(signal_frame, "is_empty"):
         if not signal_frame.is_empty():
+            t0 = time.perf_counter()
             trade_records = build_trade_records(signal_frame, dsl, trace_id)
-            for rec in trade_records:
-                try:
-                    storage.save_trade_record(**rec)
-                except Exception:
-                    pass
+            t1 = _tick("build_trade_records", t0)
+            storage.save_trade_records_batch(trade_records)
+            t2 = _tick("save_trade_records_batch", t1)
 
             events = build_trade_event_evidence(signal_frame, dsl, trace_id)
-            for evt in events:
-                try:
-                    storage.save_trade_event_evidence(**evt)
-                except Exception:
-                    pass
+            t3 = _tick("build_trade_events", t2)
+            storage.save_trade_event_evidence_batch(events)
+            _tick("save_trade_events_batch", t3)
             return
 
     # Fallback: persist trades from bt_result.trades list (light_stub or legacy)
     if bt_result.trades:
+        t0 = time.perf_counter()
+        fallback_records: list[dict[str, Any]] = []
         for trade in bt_result.trades:
             trade_id = trade.get("trade_id", "")
             if not trade_id:
                 continue
-            try:
-                storage.save_trade_record(
-                    trade_id=trade_id,
-                    strategy_id=strategy_id,
-                    trace_id=trace_id,
-                    symbol=trade.get("symbol", ""),
-                    side=trade.get("side", "long"),
-                    status="closed" if trade.get("exit_date") else "open",
-                    entry_time=trade.get("entry_date", ""),
-                    entry_price=trade.get("entry_price"),
-                    exit_time=trade.get("exit_date"),
-                    exit_price=trade.get("exit_price"),
-                    quantity=trade.get("shares"),
-                    pnl=trade.get("pnl"),
-                    pnl_pct=trade.get("pnl_pct"),
-                )
-            except Exception:
-                pass
+            fallback_records.append({
+                "trade_id": trade_id,
+                "strategy_id": strategy_id,
+                "trace_id": trace_id,
+                "symbol": trade.get("symbol", ""),
+                "side": trade.get("side", "long"),
+                "status": "closed" if trade.get("exit_date") else "open",
+                "entry_time": trade.get("entry_date", ""),
+                "entry_price": trade.get("entry_price"),
+                "exit_time": trade.get("exit_date"),
+                "exit_price": trade.get("exit_price"),
+                "quantity": trade.get("shares"),
+                "pnl": trade.get("pnl"),
+                "pnl_pct": trade.get("pnl_pct"),
+            })
+        t1 = _tick("build_fallback_trade_records", t0)
+        storage.save_trade_records_batch(fallback_records)
+        _tick("save_fallback_trade_records_batch", t1)
 
 
 # ---------------------------------------------------------------------------

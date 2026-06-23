@@ -370,14 +370,13 @@ def test_onboarding_feedback_summary() -> None:
 def test_invite_token_gate_active_blocks_without_token() -> None:
     """When HERMASS_M3_INVITE_TOKENS is set, missing token returns 403."""
     with temporary_env(HERMASS_M3_INVITE_TOKENS="alpha,beta,gamma"):
-        # Must re-import to pick up new env var
         import importlib
         import web.onboarding_routes as _or
         importlib.reload(_or)
+        import web.main as _wm
+        importlib.reload(_wm)
 
-        # Create a fresh client with the reloaded app
-        from web.main import app as fresh_app
-        tc = TestClient(fresh_app)
+        tc = TestClient(_wm.app)
         response = tc.get("/onboarding/")
         assert response.status_code == 403
         assert "Invalid or missing invite token" in response.text

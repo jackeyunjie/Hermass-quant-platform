@@ -432,6 +432,33 @@ def _check_metadata(
             f"Metadata missing keys: {missing_keys}"
         )
 
+    # Validate price adjustment semantics
+    if source:
+        source_data = meta.get(source, {})
+        price_adjustment = source_data.get("price_adjustment")
+        if price_adjustment and price_adjustment != "forward_adjusted":
+            msg = (
+                f"price_adjustment is '{price_adjustment}', "
+                "expected 'forward_adjusted' for multi-year backtests"
+            )
+            output[label]["warnings"].append(msg)
+
+
+def _check_recommended_columns(
+    con: duckdb.DuckDBPyConnection,
+    table: str,
+    output: dict,
+    label: str,
+) -> None:
+    """Warn about recommended but non-required columns for tradability checks."""
+    columns = _get_columns(con, table)
+    recommended = ["is_limit_down", "is_suspended"]
+    missing = [c for c in recommended if c not in columns]
+    if missing:
+        output[label]["warnings"].append(
+            f"Recommended columns missing: {missing}"
+        )
+
 
 def _validate_foundation(
     db_path: str,
@@ -508,6 +535,9 @@ def _validate_foundation(
         # Type checks
         col_types = _get_column_types(con, "daily_bars")
         _check_types(con, "daily_bars", col_types, output, "foundation")
+
+        # Recommended columns (tradability checks)
+        _check_recommended_columns(con, "daily_bars", output, "foundation")
 
         # Uniqueness
         _check_uniqueness(con, "daily_bars", output, "foundation")

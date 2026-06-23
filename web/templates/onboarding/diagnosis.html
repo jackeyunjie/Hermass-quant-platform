@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Hermass M3 试点 - 用户分层诊断{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>分层诊断：找到适合你的研究入口</h1>
+    <p>
+        回答 3-4 个问题，我们会推荐 H1/H2/H3 中最适合你的场域。这不是能力测试，而是需求匹配。
+    </p>
+
+    <form method="post" action="/onboarding/diagnosis">
+        {% for question in questions %}
+        <fieldset class="diagnosis-question">
+            <legend>{{ question.text }}</legend>
+            {% for value, label, _ in question.options %}
+            <label class="option">
+                <input type="radio" name="{{ question.id }}" value="{{ value }}" required>
+                <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+        </fieldset>
+        {% endfor %}
+
+        <fieldset class="diagnosis-question">
+            <legend>如果你已有偏好，可以手动选择入口（可选）</legend>
+            <label class="option">
+                <input type="radio" name="selected_level" value="">
+                <span>让系统推荐</span>
+            </label>
+            <label class="option">
+                <input type="radio" name="selected_level" value="H1">
+                <span>我想从 H1 策略构建开始</span>
+            </label>
+            <label class="option">
+                <input type="radio" name="selected_level" value="H2">
+                <span>我想从 H2 策略诊断开始</span>
+            </label>
+            <label class="option">
+                <input type="radio" name="selected_level" value="H3">
+                <span>我想从 H3 证据实验室开始</span>
+            </label>
+        </fieldset>
+
+        <div class="form-actions">
+            <button type="submit" class="btn primary">查看推荐结果</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

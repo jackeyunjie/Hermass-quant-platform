@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Hermass M3 试点 - 推荐结果{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>{{ title }}</h1>
+    <p class="lead">{{ description }}</p>
+
+    <h2>首次体验引导</h2>
+    <ol>
+        {% for step in steps %}
+        <li>{{ step }}</li>
+        {% endfor %}
+    </ol>
+
+    <div class="form-actions">
+        <a href="{{ next_url }}" class="btn primary">进入 {{ title }}</a>
+        <a href="/onboarding/diagnosis" class="btn secondary">重新诊断</a>
+    </div>
+
+    <hr>
+    <h2>试点反馈</h2>
+    <p>
+        如果你已经使用了一段时间，欢迎提交第 7 天或第 14 天反馈：
+    </p>
+    <div class="form-actions">
+        <a href="/onboarding/feedback?day=7" class="btn secondary">第 7 天反馈</a>
+        <a href="/onboarding/feedback?day=14" class="btn secondary">第 14 天反馈</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Hermass M3 试点 - 反馈汇总{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>M3 试点反馈汇总 {% if day %}（第 {{ day }} 天）{% endif %}</h1>
+    <p>共 {{ count }} 条记录</p>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>trace_id</th>
+                <th>day</th>
+                <th>level</th>
+                <th>strategies</th>
+                <th>red_line</th>
+                <th>explain</th>
+                <th>nps</th>
+                <th>modified</th>
+                <th>would_pay</th>
+                <th>time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td><code>{{ row.trace_id }}</code></td>
+                <td>{{ row.feedback_day }}</td>
+                <td>{{ row.primary_level }}</td>
+                <td>{{ row.strategies_created }}</td>
+                <td>{{ row.red_line_helpful }}</td>
+                <td>{{ row.explainability }}</td>
+                <td>{{ row.nps }}</td>
+                <td>{{ "是" if row.modified_idea else "否" }}</td>
+                <td>{{ row.would_pay }}</td>
+                <td>{{ row.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

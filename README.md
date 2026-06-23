@@ -247,7 +247,7 @@ Key modules:
 | --- | --- | --- |
 | Phase 0 | DSL schema, condition registry, red-line validation | ✅ Implemented |
 | Phase 1 | Preview, storage, audit, sample E2E runner | ✅ Implemented |
-| Phase 2 | Real Light Backtest with DuckDB + Polars | ✅ Synthetic integration (blockers resolved) |
+| Phase 2 | Real Light Backtest with DuckDB + Polars | ✅ Real data benchmark passed (2026-06-22): 5,000 symbols × 252 days P95=2.36s, 8/8 gates PASS; 3 real E2E samples 3/3 PASS |
 | Phase 3 | Web UI, richer factor/block library, industry-chain agent | ✅ Web UI implemented (Jinja2/FastAPI); factor library & industry-chain agent planned |
 
 The current default route is MVP first. Full Agent Debate, Paper Trading, TS-FM, and RAG-KG remain research backlog items.

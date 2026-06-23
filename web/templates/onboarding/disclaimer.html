@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Hermass M3 试点 - 免责声明{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>M3 受控试点：免责声明与准入确认</h1>
+    <p>
+        Hermass 当前处于早期研究工具阶段。参与试点前，请确认你理解以下边界：
+    </p>
+
+    <form method="post" action="/onboarding/consent">
+        <input type="hidden" name="consent_version" value="{{ consent_version }}">
+
+        <div class="consent-list">
+            {% for key, text in items %}
+            <label class="consent-item">
+                <input type="checkbox" name="agreed_items" value="{{ key }}" required>
+                <span>{{ text }}</span>
+            </label>
+            {% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn primary">确认并进入分层诊断</button>
+            <a href="/" class="btn secondary">返回首页</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Hermass M3 试点 - 反馈已提交{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>感谢你的反馈</h1>
+    <p>
+        第 {{ day }} 天问卷已提交，trace_id：<code>{{ trace_id }}</code>
+    </p>
+    <p>
+        你的建议会直接进入 Hermass 产品改进队列。
+    </p>
+    <div class="form-actions">
+        <a href="/" class="btn primary">返回首页</a>
+    </div>
+</div>
+{% endblock %}

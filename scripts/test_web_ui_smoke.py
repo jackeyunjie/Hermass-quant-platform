@@ -237,6 +237,131 @@ def test_readiness_not_ready_shows_light_stub_on_diagnosis_page() -> None:
         assert "light_stub" in response.text
 
 
+def test_onboarding_disclaimer_page() -> None:
+    response = client.get("/onboarding/")
+    assert response.status_code == 200
+    assert "免责声明" in response.text
+    assert "策略研究工具，不是投资建议服务" in response.text
+
+
+def test_onboarding_consent_missing_items_rejected() -> None:
+    response = client.post("/onboarding/consent", data={"agreed_items": ["research_only"]})
+    assert response.status_code == 400
+    assert "请阅读并勾选全部免责声明项" in response.text
+
+
+def test_onboarding_full_h1_journey() -> None:
+    # 1. Consent - TestClient follows redirects, so assert final diagnosis page
+    response = client.post(
+        "/onboarding/consent",
+        data={"agreed_items": ["research_only", "no_recommendation", "no_future_guarantee",
+                               "structured_process", "no_bypass", "data_limits", "feedback"]},
+    )
+    assert response.status_code == 200
+    assert "分层诊断" in response.text
+
+    # 2. Diagnosis - H1 answers
+    response = client.post(
+        "/onboarding/diagnosis",
+        data={
+            "q1": "idea",
+            "q2": "returns",
+            "q3": "explore",
+            "q4": "none",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert "/onboarding/result?level=H1" in response.headers["location"]
+
+    # 3. Result page
+    response = client.get(response.headers["location"])
+    assert response.status_code == 200
+    assert "H1：策略构建场" in response.text
+    assert "/strategy-lab/structuring" in response.text
+
+
+def test_onboarding_rejected_for_investment_advice_expectation() -> None:
+    response = client.post(
+        "/onboarding/consent",
+        data={"agreed_items": ["research_only", "no_recommendation", "no_future_guarantee",
+                               "structured_process", "no_bypass", "data_limits", "feedback"]},
+    )
+    assert response.status_code == 200
+    assert "分层诊断" in response.text
+
+    response = client.post(
+        "/onboarding/diagnosis",
+        data={
+            "q1": "auto_profit",
+            "q2": "context",
+            "q3": "records",
+            "q4": "code",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/onboarding/not-suitable"
+
+    response = client.get("/onboarding/not-suitable")
+    assert response.status_code == 200
+    assert "暂不适合参与本次试点" in response.text
+
+
+def test_onboarding_feedback_day7() -> None:
+    response = client.post(
+        "/onboarding/consent",
+        data={"agreed_items": ["research_only", "no_recommendation", "no_future_guarantee",
+                               "structured_process", "no_bypass", "data_limits", "feedback"]},
+    )
+    assert response.status_code == 200
+
+    response = client.post(
+        "/onboarding/feedback",
+        data={
+            "day": "7",
+            "primary_level": "H2",
+            "strategies_created": "2",
+            "blockers": "preview 有点慢",
+            "red_line_helpful": "4",
+            "explainability": "3",
+            "nps": "7",
+            "free_text": "希望增加更多样例",
+        },
+    )
+    assert response.status_code == 200
+    assert "感谢你的反馈" in response.text
+
+
+def test_onboarding_feedback_day14() -> None:
+    response = client.post(
+        "/onboarding/feedback",
+        data={
+            "day": "14",
+            "primary_level": "H3",
+            "strategies_created": "5",
+            "red_line_helpful": "5",
+            "explainability": "4",
+            "nps": "8",
+            "usage_count": "6",
+            "modified_idea": "true",
+            "most_wanted_feature": " Walk-Forward",
+            "most_wanted_improvement": "回测速度",
+            "would_pay": "看价格",
+        },
+    )
+    assert response.status_code == 200
+    assert "感谢你的反馈" in response.text
+
+
+def test_onboarding_feedback_summary() -> None:
+    response = client.get("/onboarding/feedback/summary")
+    assert response.status_code == 200
+    assert "M3 试点反馈汇总" in response.text
+    assert "H2" in response.text
+    assert "H3" in response.text
+
+
 if __name__ == "__main__":
     test_home_page()
     print("✅ home page")
@@ -261,5 +386,26 @@ if __name__ == "__main__":
 
     test_full_journey()
     print("✅ full journey")
+
+    test_onboarding_disclaimer_page()
+    print("✅ onboarding disclaimer page")
+
+    test_onboarding_consent_missing_items_rejected()
+    print("✅ onboarding consent validation")
+
+    test_onboarding_full_h1_journey()
+    print("✅ onboarding H1 journey")
+
+    test_onboarding_rejected_for_investment_advice_expectation()
+    print("✅ onboarding rejection flow")
+
+    test_onboarding_feedback_day7()
+    print("✅ onboarding feedback day 7")
+
+    test_onboarding_feedback_day14()
+    print("✅ onboarding feedback day 14")
+
+    test_onboarding_feedback_summary()
+    print("✅ onboarding feedback summary")
 
     print("\nAll Web UI smoke tests passed.")

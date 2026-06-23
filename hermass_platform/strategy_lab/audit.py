@@ -59,8 +59,54 @@ class StrategyAuditLogger:
             self._con.close()
             self._con = None
 
+    def init_onboarding_schema(self) -> None:
+        """Create onboarding consent and diagnosis tables if they do not exist."""
+        con = self._connect()
+        con.execute(
+            """
+            CREATE SEQUENCE IF NOT EXISTS seq_onboarding_consent_id START 1;
+            CREATE TABLE IF NOT EXISTS onboarding_consent (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_onboarding_consent_id'),
+                trace_id VARCHAR NOT NULL,
+                consent_version VARCHAR NOT NULL,
+                agreed_items JSON NOT NULL,
+                client_ip VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE SEQUENCE IF NOT EXISTS seq_onboarding_diagnosis_id START 1;
+            CREATE TABLE IF NOT EXISTS onboarding_diagnosis (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_onboarding_diagnosis_id'),
+                trace_id VARCHAR NOT NULL,
+                answers JSON NOT NULL,
+                scores JSON NOT NULL,
+                recommended_level VARCHAR NOT NULL,
+                selected_level VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE SEQUENCE IF NOT EXISTS seq_onboarding_feedback_id START 1;
+            CREATE TABLE IF NOT EXISTS onboarding_feedback (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_onboarding_feedback_id'),
+                trace_id VARCHAR NOT NULL,
+                feedback_day INTEGER NOT NULL,
+                primary_level VARCHAR NOT NULL,
+                strategies_created INTEGER,
+                blockers TEXT,
+                red_line_helpful INTEGER,
+                explainability INTEGER,
+                nps INTEGER,
+                usage_count INTEGER,
+                modified_idea BOOLEAN,
+                most_wanted_feature TEXT,
+                most_wanted_improvement TEXT,
+                would_pay TEXT,
+                free_text TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
     def init_schema(self) -> None:
-        """Create audit table if it does not exist."""
+        """Create audit tables if they do not exist."""
         con = self._connect()
         con.execute(
             """
@@ -78,6 +124,7 @@ class StrategyAuditLogger:
             )
             """
         )
+        self.init_onboarding_schema()
 
     @staticmethod
     def _hash_payload(payload: dict[str, Any]) -> str:
@@ -193,6 +240,128 @@ class StrategyAuditLogger:
             output_hash=self._hash_payload(output_payload),
             red_line_result=red_line_result or {},
         )
+
+    def log_onboarding_consent(
+        self,
+        trace_id: str,
+        consent_version: str,
+        agreed_items: dict[str, Any],
+        client_ip: str | None = None,
+    ) -> None:
+        """Log an onboarding disclaimer consent event."""
+        con = self._connect()
+        con.execute(
+            """
+            INSERT INTO onboarding_consent
+                (trace_id, consent_version, agreed_items, client_ip)
+            VALUES (?, ?, ?, ?)
+            """,
+            [
+                trace_id,
+                consent_version,
+                json.dumps(agreed_items, sort_keys=True, ensure_ascii=False, separators=(",", ":")),
+                client_ip or "",
+            ],
+        )
+
+    def log_onboarding_diagnosis(
+        self,
+        trace_id: str,
+        answers: dict[str, Any],
+        scores: dict[str, int],
+        recommended_level: str,
+        selected_level: str | None = None,
+    ) -> None:
+        """Log an onboarding H1/H2/H3 diagnosis event."""
+        con = self._connect()
+        con.execute(
+            """
+            INSERT INTO onboarding_diagnosis
+                (trace_id, answers, scores, recommended_level, selected_level)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                trace_id,
+                json.dumps(answers, sort_keys=True, ensure_ascii=False, separators=(",", ":")),
+                json.dumps(scores, sort_keys=True, ensure_ascii=False, separators=(",", ":")),
+                recommended_level,
+                selected_level or "",
+            ],
+        )
+
+    def log_onboarding_feedback(
+        self,
+        trace_id: str,
+        feedback_day: int,
+        primary_level: str,
+        strategies_created: int | None = None,
+        blockers: str | None = None,
+        red_line_helpful: int | None = None,
+        explainability: int | None = None,
+        nps: int | None = None,
+        usage_count: int | None = None,
+        modified_idea: bool | None = None,
+        most_wanted_feature: str | None = None,
+        most_wanted_improvement: str | None = None,
+        would_pay: str | None = None,
+        free_text: str | None = None,
+    ) -> None:
+        """Log an M3 pilot feedback submission (day 7 or day 14)."""
+        con = self._connect()
+        con.execute(
+            """
+            INSERT INTO onboarding_feedback
+                (trace_id, feedback_day, primary_level, strategies_created, blockers,
+                 red_line_helpful, explainability, nps, usage_count, modified_idea,
+                 most_wanted_feature, most_wanted_improvement, would_pay, free_text)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                trace_id,
+                feedback_day,
+                primary_level,
+                strategies_created,
+                blockers or "",
+                red_line_helpful,
+                explainability,
+                nps,
+                usage_count,
+                modified_idea,
+                most_wanted_feature or "",
+                most_wanted_improvement or "",
+                would_pay or "",
+                free_text or "",
+            ],
+        )
+
+    def list_feedback(
+        self,
+        feedback_day: int | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """List onboarding feedback submissions for ops review."""
+        con = self._connect()
+        if feedback_day is not None:
+            rows = con.execute(
+                """
+                SELECT * FROM onboarding_feedback
+                WHERE feedback_day = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                [feedback_day, limit],
+            ).fetchall()
+        else:
+            rows = con.execute(
+                """
+                SELECT * FROM onboarding_feedback
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                [limit],
+            ).fetchall()
+        columns = [desc[0] for desc in con.description]
+        return [dict(zip(columns, row)) for row in rows]
 
     def list_by_trace_id(self, trace_id: str) -> list[AuditRecord]:
         """Retrieve all audit records for a trace_id."""

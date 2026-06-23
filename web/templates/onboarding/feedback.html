@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Hermass M3 试点 - 第 {{ day }} 天反馈{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>第 {{ day }} 天反馈问卷</h1>
+    <p>
+        感谢你参与 Hermass M3 受控试点。你的反馈会直接写入审计库，用于产品改进。
+    </p>
+
+    <form method="post" action="/onboarding/feedback">
+        <input type="hidden" name="day" value="{{ day }}">
+
+        <fieldset class="diagnosis-question">
+            <legend>1. 你当前主要使用的功能是？</legend>
+            <label class="option"><input type="radio" name="primary_level" value="H1" required> H1 策略构建</label>
+            <label class="option"><input type="radio" name="primary_level" value="H2"> H2 策略诊断</label>
+            <label class="option"><input type="radio" name="primary_level" value="H3"> H3 证据实验室</label>
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>2. 你成功创建/验证了几个策略？</legend>
+            <input type="number" name="strategies_created" value="0" min="0">
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>3. 遇到过哪些阻塞或困惑？</legend>
+            <textarea name="blockers" rows="3" placeholder="可选"></textarea>
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>4. 红线检查对你有帮助吗？（1-5 分）</legend>
+            <input type="number" name="red_line_helpful" value="3" min="1" max="5" required>
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>5. 回测结果的可解释性如何？（1-5 分）</legend>
+            <input type="number" name="explainability" value="3" min="1" max="5" required>
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>6. 你会向同事推荐 Hermass 吗？（0-10 分，NPS）</legend>
+            <input type="number" name="nps" value="5" min="0" max="10" required>
+        </fieldset>
+
+        {% if day == 14 %}
+        <fieldset class="diagnosis-question">
+            <legend>7. 过去 7 天你使用了几次 Hermass？</legend>
+            <input type="number" name="usage_count" value="0" min="0">
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>8. 有没有基于 Hermass 的输出修改过你的策略想法？</legend>
+            <label class="option"><input type="radio" name="modified_idea" value="true"> 是</label>
+            <label class="option"><input type="radio" name="modified_idea" value="false" checked> 否</label>
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>9. 你最希望增加的功能是什么？</legend>
+            <textarea name="most_wanted_feature" rows="2" placeholder="可选"></textarea>
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>10. 你最希望改进的体验是什么？</legend>
+            <textarea name="most_wanted_improvement" rows="2" placeholder="可选"></textarea>
+        </fieldset>
+
+        <fieldset class="diagnosis-question">
+            <legend>11. 如果 Hermass 正式开放，你会付费使用吗？</legend>
+            <label class="option"><input type="radio" name="would_pay" value="是"> 是</label>
+            <label class="option"><input type="radio" name="would_pay" value="否"> 否</label>
+            <label class="option"><input type="radio" name="would_pay" value="看价格" checked> 看价格</label>
+        </fieldset>
+        {% endif %}
+
+        <fieldset class="diagnosis-question">
+            <legend>其他建议</legend>
+            <textarea name="free_text" rows="3" placeholder="可选"></textarea>
+        </fieldset>
+
+        <div class="form-actions">
+            <button type="submit" class="btn primary">提交反馈</button>
+            <a href="/" class="btn secondary">返回首页</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

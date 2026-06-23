@@ -189,9 +189,18 @@ S 级私董会把人按问题成熟度和参与强度分为 S1/S2/S3/S4。Hermas
 
 当前状态：
 
-- 阻塞。
-- `data/p116_foundation.duckdb` 不存在。
-- `data/state_cube.duckdb` 不存在。
+- ✅ 已完成（2026-06-19）。
+- `data/p116_foundation.duckdb` 已构建：5,536 品种，8,591,347 行，2018-05-15 ~ 2026-06-18。
+- `data/state_cube.duckdb` 已构建：5,536 品种，三周期状态（D1/W1/MN1）。
+- `validate_real_data.py`：ok=true，errors=[]。
+- `gate_summary.py`：8/8 PASS。
+- Light Backtest 5000×252 `full_polars`：P50=2.22s，P95=2.36s（<30s gate）。
+- data_load P95=0.26s（<10s），signal_gen P95=0.22s（<12s），equity+metrics P95=1.92s（<8s）。
+- peak_memory=0.04MB（<4096MB）。
+- failure_count=0。
+- 3 个冻结样例 real E2E acceptance：3/3 passed，`light_real_v1` mode。
+
+里程碑门槛：全部达标。
 
 门槛：
 

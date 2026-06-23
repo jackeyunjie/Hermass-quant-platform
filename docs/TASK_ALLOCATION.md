@@ -137,16 +137,18 @@
 验收：
 - 能回答 5000 品种 252 天 <30s 是否可行。
 
-状态：已完成，真实数据性能门禁通过。
+状态：已完成，真实数据性能门禁通过（2026-06-22 复核）。
 
 采纳结论：
 - Phase 2 默认采用 DuckDB 取数 + Polars 信号/权益曲线/绩效指标。
-- Light Backtest <30s 已验证：5,000 品种 × 252 天 P95=2.12s，8/8 gates PASS。
+- Light Backtest <30s 已验证：5,000 品种 × 252 天 P50=2.218s / P95=2.364s，8/8 gates PASS。
 - `filter_first` 作为信号稀疏策略的默认优化方向。
+- DSL 端到端 backtest 路径（含 preview/validation/audit/storage）约 27-32s，超出纯 engine 时间，但不在 M2 Phase 2 性能门禁范围内；作为 M3 Pilot 已知开销记录。
 
 复核结果：
+- `outputs/benchmarks/light_backtest_real_5000.jsonl`：P50=2.218s, P95=2.364s, peak_memory=0.04MB。
 - `outputs/benchmarks/gate_summary_20260619.json` 8/8 gates PASS。
-- P50=1.97s, P95=2.12s, peak memory 0.04 MB。
+- `outputs/benchmarks/real_e2e_full_benchmark_20260622_192555.json`：3 样例全部 light_real_v1 PASS，audit operations 完整（generation/validation/preview/backtest）。
 
 ### K2: Foundation DB 指标预计算建议
 

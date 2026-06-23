@@ -28,7 +28,12 @@ from hermass_platform.strategy_lab.backtest_adapter import (
     BacktestResult as EngineBacktestResult,
     run_dsl_backtest,
 )
+from hermass_platform.strategy_lab.backtest_evidence import (
+    build_trade_event_evidence,
+    build_trade_records,
+)
 from hermass_platform.strategy_lab.dsl_schema import StrategyDSL
+from hermass_platform.strategy_lab.e2e_runner import _persist_trades_and_events
 from hermass_platform.strategy_lab.dsl_validator import ValidationLevel, validate_dsl
 from hermass_platform.strategy_lab.e2e_runner import NLToDSLParser
 from hermass_platform.strategy_lab.preview_service import PreviewService
@@ -477,22 +482,20 @@ async def diagnosis_run(
                 metrics=persisted_metrics,
                 dsl_snapshot=dsl_snapshot,
             )
-            for trade in response.trades or []:
-                storage.save_trade_record(
-                    trade_id=trade.get("trade_id", f"{trace_id}-{trade.get('symbol', 'unknown')}"),
-                    strategy_id=strategy_id,
+            # Persist full trade records and event evidence from signal frame.
+            # Use the engine result (not the truncated response) so storage holds
+            # the complete set and events satisfy the foreign-key constraint.
+            try:
+                _persist_trades_and_events(
+                    storage=storage,
+                    bt_result=engine_result,
+                    dsl=dsl_obj,
                     trace_id=trace_id,
-                    symbol=trade.get("symbol", "unknown"),
-                    side=trade.get("side", "long"),
-                    status="closed",
-                    entry_time=trade.get("entry_date", ""),
-                    entry_price=trade.get("entry_price"),
-                    exit_time=trade.get("exit_date"),
-                    exit_price=trade.get("exit_price"),
-                    quantity=trade.get("shares"),
-                    pnl=trade.get("pnl"),
-                    pnl_pct=trade.get("pnl_pct"),
+                    strategy_id=strategy_id,
                 )
+            except Exception as persist_exc:  # noqa: BLE001
+                errors.append(f"交易证据保存失败: {persist_exc}")
+                traceback.print_exc()
 
             audit.log_backtest(
                 trace_id=trace_id,

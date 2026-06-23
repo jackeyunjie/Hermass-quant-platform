@@ -4,6 +4,7 @@
 > 指派：Kimi Research Engineer
 > 依赖：M3 onboarding 系统已完成（C21），5 个 invite token 已生成
 > 阻塞：无（本任务为研究/文案任务，不阻塞工程）
+> 状态：✅ 已完成 — 交付物见 `data/research/conversations/agent-runs/2026-06-22-kimi-m3-pilot-user-personas.md`
 
 ---
 

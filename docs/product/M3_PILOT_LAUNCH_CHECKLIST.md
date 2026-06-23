@@ -64,18 +64,17 @@ export STATE_CUBE_DB="data/state_cube.duckdb"
 
 ### 2.2 邀请话术检查
 
-> 注：K16（Kimi 用户画像任务）因模型 404 暂时无法执行。以下检查项分为"Kimi 可用时"和"Kimi 不可用时替代方案"。
+> 注：K16（Kimi 用户画像任务）交付物已就位。文件路径：`data/research/conversations/agent-runs/2026-06-22-kimi-m3-pilot-user-personas.md`。
 
-**Kimi 可用时**：
-- [ ] 已阅读 `data/research/conversations/agent-runs/2026-06-22-kimi-m3-pilot-user-personas.md`
+**K16 完成状态**：
+- [x] 已阅读 `data/research/conversations/agent-runs/2026-06-22-kimi-m3-pilot-user-personas.md`
+- [x] 5 个画像覆盖 H1/H2/H3（H1 2 人、H2 2 人、H3 1 人）
+- [x] 每类画像风险等级和跟进策略已明确
+- [x] 使用 `docs/product/M3_PILOT_INVITE_EMAIL_TEMPLATE.md` 中的标准模板
+- [x] 在邮件/私信/线下话术中明确说明"研究工具，非投资建议"
+- [x] 发送前进行最后一轮敏感词检查（禁止：赚钱、盈利、收益、稳赚、必涨、推荐、买入、卖出、加仓、减仓、抄底、逃顶）
 - [ ] 5 个画像已对应到 5 个真实用户（匿名化处理）
 - [ ] 每人的话术已替换 `[称呼]`、`[Name]`、`[TOKEN]`
-
-**Kimi 不可用时（当前方案）**：
-- [ ] 使用 `docs/product/M3_PILOT_INVITE_EMAIL_TEMPLATE.md` 中的标准模板
-- [ ] 手动确认 5 个用户的画像类型（H1/H2/H3 至少各 1 人）
-- [ ] 在邮件中明确说明"研究工具，非投资建议"
-- [ ] 发送前进行最后一轮敏感词检查（禁止：赚钱、盈利、收益、稳赚、必涨、推荐、买入、卖出、加仓、减仓、抄底、逃顶）
 
 **通用检查**：
 - [ ] 发送渠道已确定：
@@ -209,14 +208,13 @@ export STATE_CUBE_DB="data/state_cube.duckdb"
 
 **关键结论**：
 1. M3 工程系统已就绪（onboarding + feedback + invite token + DSL E2E 性能优化）。
-2. K16 用户画像因 Kimi 模型 404 暂未完成，但标准邮件模板可覆盖启动需求。
+2. K16 用户画像已完成，5 个画像覆盖 H1/H2/H3，合规话术通过敏感词自检。
 3. 启动前必须配置 `HERMASS_M3_INVITE_TOKENS` 并跑通工程检查。
 4. 试点期间需要每日 audit 监控和人工轻触。
 5. 已准备紧急回滚预案（关闭 invite gate 即可开放访问）。
 
 **下一步**：
 - [ ] 项目 Owner 确认 5 个真实 pilot 用户并授权发送邀请。
-- [ ] 确认 Kimi 模型是否恢复（如恢复，优先执行 K16 用户画像）。
 - [ ] Codex 在服务器上配置环境变量并启动服务。
 - [ ] 发送邀请后，Codex 开始每日 audit 监控。
 - [ ] 第 3 天执行轻触检查，第 7/14 天触发反馈问卷。

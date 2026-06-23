@@ -1,8 +1,9 @@
 # M3 Pilot 5 人目标用户画像与合规邀请话术
 
 > 任务编号：K16
-> 执行 Agent：Kimi Research Engineer
+> 执行 Agent：Kimi Research Engineer（Kimi 模型 404 期间由 Codex 复核并确认使用）
 > 日期：2026-06-22
+> 状态：✅ 已完成
 > 依赖：M3 onboarding 系统已完成，5 个 invite token 已生成
 
 ---

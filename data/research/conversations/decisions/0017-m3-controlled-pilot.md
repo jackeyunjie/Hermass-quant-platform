@@ -93,7 +93,7 @@ http://<host>/onboarding/?invite=VFmDwizfH8kkj3Gz09lq_A
 2. ✅ **Codex**：免责声明电子签收（存储到 audit_db）— 已完成
 3. ✅ **Codex**：邀请 token 白名单机制 — 已完成
 4. ✅ **Codex**：反馈收集表单（第 7/14 天）— 已完成
-5. **Kimi**：设计 5 人目标用户画像和邀请话术（合规安全）
+5. ✅ **Kimi/Codex**：设计 5 人目标用户画像和邀请话术（合规安全）— 已完成，见 `data/research/conversations/agent-runs/2026-06-22-kimi-m3-pilot-user-personas.md`
 6. **Qoder**：review 分层诊断问题集，确认路由逻辑无偏差
 7. **Codex**：启动 pilot 后，每日检查 audit_db 中的 onboarding 记录和反馈汇总
 

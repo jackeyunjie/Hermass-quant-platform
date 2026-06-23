@@ -10,7 +10,7 @@ Chinese strategy input
   -> Schema/Pydantic validation
   -> red-line checks
   -> condition hit preview
-  -> Light Backtest stub
+  -> Light Backtest (light_real_v1 on real DuckDB)
   -> report and audit storage
 ```
 
@@ -29,7 +29,7 @@ Chinese strategy input
 - Not a real-order execution system.
 - Not a performance or profit guarantee.
 
-Current Light Backtest output is explicitly marked as `light_stub`. It is a framework placeholder, not real historical performance.
+Light Backtest supports `light_real_v1` against real DuckDB data (`data/p116_foundation.duckdb`) when available, and falls back to `light_stub` only when the real data baseline is not ready. All outputs are tagged explicitly and carry a not-investment-advice disclaimer.
 
 ## Current Status
 
@@ -60,6 +60,13 @@ Phase 2 Hardening (2026-06-19):
 - ✅ Multi-symbol date-level execution semantics (sort: `date ASC, symbol ASC`).
 - ✅ Trade/event evidence E2E persistence via `BacktestResult.signal_frame`.
 - ✅ `volume_ratio OR volume_ma_N` provider alternate group contract.
+- ✅ Real-data baseline READY: 5,536 symbols, 8.6M rows, P95 < 2.2s for 5,000×252 light backtest.
+- ✅ Real-data E2E acceptance: 3 frozen Chinese samples pass end-to-end on `light_real_v1`.
+
+Phase 3+ Web UI & API (2026-06-22):
+
+- ✅ JSON API endpoints under `/api/strategy-lab/*` (generate, validate, preview, backtest, get).
+- ✅ Web UI persists full trade records and trade event evidence from real backtests.
 
 Phase 3 Web UI (2026-06-19):
 
@@ -74,8 +81,9 @@ Phase 3 Web UI (2026-06-19):
 Latest local verification:
 
 - Strategy Lab tests: `278 passed`.
+- Web UI smoke test: `8 passed`.
 - MVP E2E acceptance: `5/5 cases passed`.
-- Web UI smoke test: `5/5 checks passed`.
+- Real-data E2E acceptance: `3/3 cases passed` on 100-symbol universe.
 
 ## Quickstart
 
@@ -93,6 +101,12 @@ Run the MVP acceptance chain:
 
 ```bash
 python3 scripts/run_strategy_lab_mvp_e2e_acceptance.py
+```
+
+Run the real-data acceptance chain (requires `data/p116_foundation.duckdb`):
+
+```bash
+python3 scripts/run_strategy_lab_real_e2e_acceptance.py
 ```
 
 Run Strategy Lab tests:

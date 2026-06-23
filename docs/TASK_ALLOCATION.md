@@ -71,10 +71,16 @@
 - 每个 API 有请求/响应 schema。
 - 每个 API 标注业务逻辑所在 service 文件。
 
-状态：Qoder 已完成 Phase 1 设计，Codex 已复核，待实现。
+状态：已完成。
 
 交付：
 - `agents/PHASE1_API_PREVIEW_DESIGN.md`
+- `web/api_routes.py` 实现 `/api/strategy-lab/*` JSON API
+- `web/strategy_lab_routes.py` 实现 HTML 表单路由
+
+复核结果：
+- JSON API 手动测试通过（generate / backtest / get backtest）。
+- Web UI smoke test 8 passed。
 
 采纳结论：
 - `ConditionSpec` 应增加字段/表依赖元数据。
@@ -131,12 +137,16 @@
 验收：
 - 能回答 5000 品种 252 天 <30s 是否可行。
 
-状态：已完成研究方案，等待可运行 benchmark 脚本和真实基线数据。
+状态：已完成，真实数据性能门禁通过。
 
 采纳结论：
 - Phase 2 默认采用 DuckDB 取数 + Polars 信号/权益曲线/绩效指标。
-- Light Backtest <30s 现实，但必须避免 Python 逐行循环。
+- Light Backtest <30s 已验证：5,000 品种 × 252 天 P95=2.12s，8/8 gates PASS。
 - `filter_first` 作为信号稀疏策略的默认优化方向。
+
+复核结果：
+- `outputs/benchmarks/gate_summary_20260619.json` 8/8 gates PASS。
+- P50=1.97s, P95=2.12s, peak memory 0.04 MB。
 
 ### K2: Foundation DB 指标预计算建议
 
@@ -220,16 +230,18 @@
 - 能指导 Codex 在 `p116_foundation.duckdb` 和 `state_cube.duckdb` 就绪后跑出真实基线。
 - 明确 synthetic smoke 与 real benchmark 的区别。
 
-状态：已完成 runbook，已演进为 Phase 3 handoff。
+状态：已完成，真实数据 baseline 已就绪。
 
 状态更新：
 - Kimi 已完成 runbook，文件：`data/research/conversations/agent-runs/2026-06-06-kimi-real-data-benchmark-runbook.md`。
 - Codex 采纳 Hot Path Gates 作为 Phase 2 性能验收基线。
-- 后续需实现 `benchmarks/validate_real_data.py`，并改进 benchmark 分阶段计时、`--symbols/--days/--runs` 参数。
+- `benchmarks/validate_real_data.py` 已实现，`outputs/benchmarks/real_data_validation_20260619.json` errors=0。
+- `data/p116_foundation.duckdb` 和 `data/state_cube.duckdb` 已就绪，verdict=READY（5,536 品种，8.6M 行）。
 - 已演进为 Phase 3 真实数据 baseline handoff，任务文件：`agents/KIMI_NEXT_TASK_PHASE3_REAL_BASELINE_HANDOFF.md`。
 
 下一轮任务：
-- `agents/KIMI_NEXT_TASK_PHASE3_REAL_BASELINE_HANDOFF.md`
+- 扩展 `validate_real_data.py` P0 checks：停牌/退市/复权口径。
+- 真实数据 E2E 验收常态化：`scripts/run_strategy_lab_real_e2e_acceptance.py`。
 
 ### K6: 高配因子库研究
 

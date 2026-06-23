@@ -23,7 +23,7 @@ M2（Real Data Baseline）已于 2026-06-22 完成并复核：
 | 运行标签不可隐藏 | ✅ | `synthetic`/`light_stub`/`light_real_v1` 显式展示 |
 | 红线不可绕过 | ✅ | DSL validator 强制拦截，无 skip 入口 |
 | audit 可追溯 | ✅ | 每步 trace_id 可查 |
-| 用户身份可控 | ⚠️ | 当前无认证，靠邀请链接 + 白名单控制 |
+| 用户身份可控 | ✅ | 邀请 token 白名单机制已落地（`HERMASS_M3_INVITE_TOKENS`） |
 
 ### 2. 试点边界
 
@@ -33,9 +33,27 @@ M2（Real Data Baseline）已于 2026-06-22 完成并复核：
 - **周期**：2 周观察期，收集反馈后决定是否扩大
 - **数据**：使用现有 `light_real_v1` 回测，不承诺实时数据
 
-### 3. 用户分层诊断表（H1/H2/H3 进入标准）
+### 3. 邀请 Token 列表（首轮 5 人）
 
-见 `docs/product/H1_H2_H3_USER_DIAGNOSIS.md`（待创建）。
+> ⚠️ 这些 token 仅用于 M3 首轮试点。发送后请在下方记录使用人和发送日期。
+
+| 编号 | Token | 状态 | 使用人 | 发送日期 |
+|---|---|---|---|---|
+| pilot-01 | `VFmDwizfH8kkj3Gz09lq_A` | 未使用 | — | — |
+| pilot-02 | `cfIPwHmW0G9rjm4rDQuHBA` | 未使用 | — | — |
+| pilot-03 | `AlLg1MjVVC0a6SuY-4EGOA` | 未使用 | — | — |
+| pilot-04 | `IjDV09cbRTk_NCw7VKZpXQ` | 未使用 | — | — |
+| pilot-05 | `Jlww1D1kOwJEfz4oDSkJgA` | 未使用 | — | — |
+
+**使用方式**：将 token 附加到 onboarding URL，例如：
+```
+http://<host>/onboarding/?invite=VFmDwizfH8kkj3Gz09lq_A
+```
+首次验证通过后，token 会写入 httponly cookie，后续访问无需再带参数。
+
+### 4. 用户分层诊断表（H1/H2/H3 进入标准）
+
+见 `docs/product/H1_H2_H3_USER_DIAGNOSIS.md`。
 
 核心逻辑：
 
@@ -44,15 +62,15 @@ M2（Real Data Baseline）已于 2026-06-22 完成并复核：
 - H3（Strategy Evidence）：用户接受"假设-证据-复盘"循环 → 进入真实回测 + Evidence Lab
 - 跳过判断：只想收益率/买卖点 → 不适合，引导至免责声明
 
-### 4. Onboarding 流程
+### 5. Onboarding 流程
 
-1. **邀请发送**：手动发送含免责声明链接的私信/邮件
-2. **免责声明签收**：用户必须勾选"我理解 Hermass 是研究工具..."（电子记录）
-3. **分层诊断**：回答 3-5 个问题，自动推荐 H1/H2/H3 入口
+1. **邀请发送**：手动发送含 token 的 onboarding 链接（私信/邮件）
+2. **免责声明签收**：用户必须勾选全部 7 项声明（电子记录，audit_db 留存）
+3. **分层诊断**：回答 4 个问题，自动推荐 H1/H2/H3 入口
 4. **首次体验**：冻结样例引导（MA5/MA20 策略），展示完整链路
 5. **反馈收集**：第 7 天和第 14 天各一次结构化问卷
 
-### 5. 停止标准
+### 6. 停止标准
 
 出现以下任一情况，暂停试点：
 
@@ -60,6 +78,7 @@ M2（Real Data Baseline）已于 2026-06-22 完成并复核：
 - 用户将回测结果作为投资建议传播
 - 系统性能导致用户体验不可接受（>60s 等待）
 - 数据质量投诉（停牌/退市/复权问题）
+- NPS < 5 且 2 人以上反馈"不推荐使用"
 
 ## 理由
 
@@ -70,14 +89,18 @@ M2（Real Data Baseline）已于 2026-06-22 完成并复核：
 
 ## 下一步
 
-1. **Codex**：创建 H1/H2/H3 用户诊断表页面（Web UI 新增 `/onboarding` 路由）
-2. **Codex**：实现免责声明电子签收（存储到 audit_db）
-3. **Kimi**：设计 5 人目标用户画像和邀请话术（合规安全）
-4. **Qoder**：设计分层诊断问题集（3-5 题，自动路由 H1/H2/H3）
-5. **Codex**：实现反馈收集表单（第 7/14 天触发）
+1. ✅ **Codex**：H1/H2/H3 用户诊断表页面（`/onboarding` 路由）— 已完成
+2. ✅ **Codex**：免责声明电子签收（存储到 audit_db）— 已完成
+3. ✅ **Codex**：邀请 token 白名单机制 — 已完成
+4. ✅ **Codex**：反馈收集表单（第 7/14 天）— 已完成
+5. **Kimi**：设计 5 人目标用户画像和邀请话术（合规安全）
+6. **Qoder**：review 分层诊断问题集，确认路由逻辑无偏差
+7. **Codex**：启动 pilot 后，每日检查 audit_db 中的 onboarding 记录和反馈汇总
 
 ## 参考
 
 - `docs/product/VISION_MILESTONES_AND_KEY_ASSUMPTIONS.md` M3 章节
+- `docs/product/H1_H2_H3_USER_DIAGNOSIS.md`
+- `docs/product/M3_PILOT_ONBOARDING.md`
 - `data/research/conversations/decisions/0011-external-service-readiness.md`
 - `data/research/conversations/decisions/0014-phase2-light-backtest-implemented.md`

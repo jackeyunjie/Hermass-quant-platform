@@ -84,31 +84,35 @@ def load_benchmark_records(path: str | None) -> list[dict] | None:
     return records
 
 
+def _pct(values: list[float], p: float) -> float | None:
+    if not values:
+        return None
+    s = sorted(values)
+    if len(s) == 1:
+        return s[0]
+    idx = int(len(s) * p)
+    idx = min(idx, len(s) - 1)
+    return s[idx]
+
+
 def summarize_benchmark(records: list[dict]) -> dict:
-    """Compute per-mode percentiles and failure counts."""
-    by_mode: dict[str, list[dict]] = {}
+    """Compute per-mode/universe percentiles and failure counts."""
+    by_key: dict[tuple[str, int], list[dict]] = {}
     for rec in records:
-        by_mode.setdefault(rec.get("mode", "unknown"), []).append(rec)
+        mode = rec.get("mode", "unknown")
+        universe_n = rec.get("universe_n", 0) or 0
+        by_key.setdefault((mode, universe_n), []).append(rec)
 
     summary: dict[str, dict] = {}
-    for mode, recs in by_mode.items():
+    for (mode, universe_n), recs in by_key.items():
         totals = [r["elapsed_s"] for r in recs if "elapsed_s" in r]
         data_loads = [r.get("data_load_s") for r in recs if r.get("data_load_s") is not None]
         signal_gens = [r.get("signal_gen_s") for r in recs if r.get("signal_gen_s") is not None]
         equity_metrics = [r.get("equity_metrics_s") for r in recs if r.get("equity_metrics_s") is not None]
         memories = [r.get("peak_memory_mb") for r in recs if r.get("peak_memory_mb") is not None]
 
-        def _pct(values: list[float], p: float) -> float | None:
-            if not values:
-                return None
-            s = sorted(values)
-            if len(s) == 1:
-                return s[0]
-            idx = int(len(s) * p)
-            idx = min(idx, len(s) - 1)
-            return s[idx]
-
-        summary[mode] = {
+        key = f"{mode}_{universe_n}"
+        summary[key] = {
             "runs": len(recs),
             "total_p50_s": _pct(totals, 0.50),
             "total_p95_s": _pct(totals, 0.95),
@@ -117,6 +121,30 @@ def summarize_benchmark(records: list[dict]) -> dict:
             "equity_metrics_p95_s": _pct(equity_metrics, 0.95),
             "peak_memory_p95_mb": _pct(memories, 0.95),
             "failure_count": 0,  # synthetic/real baseline scripts do not inject failures
+            "universe_n": universe_n,
+            "days": recs[0].get("days") if recs else None,
+            "data_source": recs[0].get("data_source") if recs else None,
+        }
+
+    # Also expose legacy per-mode aggregates for callers that expect them
+    by_mode: dict[str, list[dict]] = {}
+    for rec in records:
+        by_mode.setdefault(rec.get("mode", "unknown"), []).append(rec)
+    for mode, recs in by_mode.items():
+        totals = [r["elapsed_s"] for r in recs if "elapsed_s" in r]
+        data_loads = [r.get("data_load_s") for r in recs if r.get("data_load_s") is not None]
+        signal_gens = [r.get("signal_gen_s") for r in recs if r.get("signal_gen_s") is not None]
+        equity_metrics = [r.get("equity_metrics_s") for r in recs if r.get("equity_metrics_s") is not None]
+        memories = [r.get("peak_memory_mb") for r in recs if r.get("peak_memory_mb") is not None]
+        summary[mode] = {
+            "runs": len(recs),
+            "total_p50_s": _pct(totals, 0.50),
+            "total_p95_s": _pct(totals, 0.95),
+            "data_load_p95_s": _pct(data_loads, 0.95),
+            "signal_gen_p95_s": _pct(signal_gens, 0.95),
+            "equity_metrics_p95_s": _pct(equity_metrics, 0.95),
+            "peak_memory_p95_mb": _pct(memories, 0.95),
+            "failure_count": 0,
             "universe_n": recs[0].get("universe_n") if recs else None,
             "days": recs[0].get("days") if recs else None,
             "data_source": recs[0].get("data_source") if recs else None,
@@ -140,9 +168,16 @@ def evaluate_gates(validation: dict | None, benchmark_summary: dict) -> tuple[bo
     if not dv_ok:
         overall = False
 
-    # Benchmark gates: focus on full_polars mode for real baseline
-    target_mode = "full_polars"
-    if target_mode not in benchmark_summary:
+    # Benchmark gates: focus on full_polars mode for real baseline,
+    # preferring the largest universe_n available (e.g. full_polars_5000).
+    target_mode = None
+    full_polars_keys = [k for k in benchmark_summary.keys() if k.startswith("full_polars_")]
+    if full_polars_keys:
+        target_mode = max(full_polars_keys, key=lambda k: int(k.split("_")[-1]))
+    elif "full_polars" in benchmark_summary:
+        target_mode = "full_polars"
+
+    if target_mode is None:
         results.append({
             "gate": "light_backtest_full_polars_present",
             "value": None,

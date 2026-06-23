@@ -1,0 +1,11 @@
+{
+  "price_adjustment": "forward_adjusted",
+  "data_source": "blackwolf_real",
+  "license_status": "research_only",
+  "last_refresh_at": "2026-06-19T08:45:32.684299Z",
+  "symbol_count": 5536,
+  "date_min": "2018-05-15",
+  "date_max": "2026-06-18",
+  "daily_bars_rows": 8591347,
+  "state_cube_rows": 8591347
+}

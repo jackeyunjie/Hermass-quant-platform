@@ -12,6 +12,7 @@ import json
 import platform
 import statistics
 import sys
+import tempfile
 import time
 import tracemalloc
 from datetime import datetime
@@ -22,6 +23,28 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _synthetic import create_synthetic_db
+
+
+def _duckdb_result_to_polars(result: duckdb.DuckDBPyResult) -> pl.DataFrame:
+    """Convert DuckDB result to Polars DataFrame without pyarrow."""
+    columns = [desc[0] for desc in result.description]
+    rows = result.fetchall()
+    return pl.DataFrame(rows, schema=columns, orient="row")
+
+
+def _load_via_parquet(con: duckdb.DuckDBPyConnection, sql: str) -> pl.DataFrame:
+    """Execute SQL, export result to temp parquet, and read with Polars.
+
+    Much faster than fetchall() for large result sets when pyarrow is not
+    available.
+    """
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        con.execute(f"COPY ({sql}) TO '{tmp_path.as_posix()}' (FORMAT PARQUET)")
+        return pl.read_parquet(tmp_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def parse_args() -> argparse.Namespace:
@@ -140,19 +163,20 @@ def benchmark_mode(
         t0 = time.perf_counter()
         con = duckdb.connect(db_path)
         try:
+            # Avoid network/extension autoload stalls; parquet extension is bundled
+            con.execute("SET autoinstall_known_extensions=false")
+            con.execute("SET autoload_known_extensions=false")
             if mode == "full_polars":
-                df = con.execute(
-                    f"""
+                sql = f"""
                     SELECT symbol, date, close, ma_5, ma_10, ma_20
                     FROM daily_bars
                     WHERE symbol IN (
                         SELECT DISTINCT symbol FROM daily_bars LIMIT {universe_n}
                     )
-                    """
-                ).pl()
+                """
+                df = _load_via_parquet(con, sql)
             else:  # filter_first
-                df = con.execute(
-                    f"""
+                sql = f"""
                     SELECT symbol, date, close, ma_5, ma_10, ma_20
                     FROM daily_bars
                     WHERE symbol IN (
@@ -163,8 +187,8 @@ def benchmark_mode(
                         OR ma_5 > ma_20
                         OR ma_5 < ma_10
                     )
-                    """
-                ).pl()
+                """
+                df = _load_via_parquet(con, sql)
         finally:
             con.close()
         t1 = time.perf_counter()

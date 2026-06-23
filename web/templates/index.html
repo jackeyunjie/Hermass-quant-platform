@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Hermass Strategy Lab - 首页{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>AI 原生量化策略研究系统</h1>
+    <p>
+        Hermass 不是自动荐股工具，也不是交易机器人。
+        它是一个把中文策略想法结构化、可验证、可审计的研究平台。
+    </p>
+</section>
+
+<section class="cards">
+    <div class="card">
+        <h2>策略构建</h2>
+        <p>输入中文策略描述，生成结构化 DSL，并立即接受 schema 校验与红线检查。</p>
+        <a class="btn" href="/strategy-lab/structuring">开始构建</a>
+    </div>
+    <div class="card">
+        <h2>策略诊断</h2>
+        <p>按 trace_id 预览条件命中、运行 Light Backtest，查看运行模式与核心指标。</p>
+        <a class="btn" href="/strategy-lab/diagnosis">开始诊断</a>
+    </div>
+    <div class="card">
+        <h2>证据实验室</h2>
+        <p>查询完整审计链路、交易明细与多周期 state 快照，支撑策略复盘。</p>
+        <a class="btn" href="/strategy-lab/evidence">查看证据</a>
+    </div>
+</section>
+
+<section class="notice">
+    <h3>当前状态</h3>
+    <ul>
+        <li>MVP 链路已完成：中文输入 → DSL → 校验 → 红线 → Preview → Backtest → Audit。</li>
+        <li>Light Backtest 当前运行模式：<strong>{{ run_tag | default('synthetic') }}</strong>。</li>
+        <li>
+            数据基线状态：
+            <span class="tag {{ readiness_badge | default('failed') }}">
+                {{ readiness_verdict | default('NOT_READY') }}
+            </span>
+            — {{ readiness_message | default('真实数据基线尚未就绪，当前仅支持 synthetic / light_stub 模式。') }}
+        </li>
+        <li>真实数据基线验证完成前，所有回测结果不得视为真实绩效。</li>
+    </ul>
+    {% if readiness_next_steps %}
+    <h4>下一步</h4>
+    <ul>
+        {% for step in readiness_next_steps %}
+        <li>{{ step }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</section>
+{% endblock %}

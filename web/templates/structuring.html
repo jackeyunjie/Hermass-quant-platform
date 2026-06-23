@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}策略构建 - Hermass Strategy Lab{% endblock %}
+
+{% block content %}
+<h1>策略构建</h1>
+
+<form method="post" action="/strategy-lab/structuring" class="form-card">
+    <div class="form-group">
+        <label for="strategy_id">策略 ID</label>
+        <input type="text" id="strategy_id" name="strategy_id" value="{{ strategy_id }}" required
+               pattern="[a-z0-9_]+" placeholder="ma5_cross_ma20_stop_8">
+        <small>仅允许小写字母、数字和下划线</small>
+    </div>
+    <div class="form-group">
+        <label for="natural_language">中文策略描述</label>
+        <textarea id="natural_language" name="natural_language" rows="4" required
+                  placeholder="MA5上穿MA20买入，跌破MA10卖出，止损8%">{{ natural_language }}</textarea>
+    </div>
+    <button type="submit" class="btn primary">生成并校验</button>
+</form>
+
+{% if generation_errors %}
+<div class="error-box">
+    <h3>生成失败</h3>
+    {% for error in generation_errors %}
+    <p>{{ error }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if validation %}
+<section class="result-card">
+    <h2>校验结果</h2>
+    <p><strong>状态：</strong>
+        {% if validation.passed %}
+        <span class="tag success">通过</span>
+        {% else %}
+        <span class="tag failed">失败</span>
+        {% endif %}
+    </p>
+    <p><strong>最高错误级别：</strong> {{ validation.level }}</p>
+
+    {% if validation.errors %}
+    <h3>错误</h3>
+    <ul class="detail-list">
+        {% for error in validation.errors %}
+        <li>
+            <code>{{ error.code }}</code> {{ error.message }}
+            {% if error.path %}<small>(路径: {{ error.path }})</small>{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if validation.warnings %}
+    <h3>警告</h3>
+    <ul class="detail-list">
+        {% for warning in validation.warnings %}
+        <li><code>{{ warning.code }}</code> {{ warning.message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <h3>红线检查</h3>
+    <p>
+        {% if red_line_result.passed %}
+        <span class="tag success">通过</span>
+        {% else %}
+        <span class="tag failed">拒绝</span>
+        {% endif %}
+    </p>
+    {% if red_line_result.triggered_rules %}
+    <ul class="detail-list">
+        {% for rule in red_line_result.triggered_rules %}
+        <li>
+            <code>{{ rule }}</code>
+            {% if rule == "RL_EXIT_MUST_HAVE_STOP_LOSS" %}
+            — 策略缺少止损条件
+            {% elif rule == "RL_MAX_POSITION" %}
+            — 仓位超过 25%
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if validation.passed and red_line_result.passed %}
+    <div class="actions">
+        <a class="btn" href="/strategy-lab/diagnosis?trace_id={{ trace_id }}">进入策略诊断 →</a>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if dsl %}
+<section class="result-card">
+    <h2>生成的 DSL</h2>
+    <details>
+        <summary>展开 / 收起</summary>
+        <pre class="code-block">{{ dsl | tojson(indent=2) }}</pre>
+    </details>
+</section>
+{% endif %}
+{% endblock %}

@@ -977,6 +977,41 @@ Codex 当前裁决：
 - 真实 DB 缺失继续阻塞 `light_real_v1` 默认发布和真实指标试点，但不阻塞 Web UI mock/synthetic 验收。
 - Web UI 后续应读取 Kimi 产出的 `data_readiness_status.json`，向用户显示当前真实数据 readiness 状态。
 
+### C21: M3 受控试点 Onboarding 系统
+
+交付：
+- `web/onboarding_routes.py`：H1/H2/H3 用户诊断、免责声明签收、反馈收集
+- `web/templates/onboarding/`：7 个 HTML 模板（disclaimer/diagnosis/result/not_suitable/feedback/feedback_thanks/feedback_summary）
+- `hermass_platform/strategy_lab/audit.py`：扩展 onboarding_consent / onboarding_diagnosis / onboarding_feedback 表
+- `docs/product/H1_H2_H3_USER_DIAGNOSIS.md`：4 题诊断集与路由规则
+- `docs/product/M3_PILOT_ONBOARDING.md`：5 人试点流程、免责签收、停止标准
+- `data/research/conversations/decisions/0017-m3-controlled-pilot.md`：M3 启动决策记录
+- `docs/product/M3_PILOT_INVITE_EMAIL_TEMPLATE.md`：邀请邮件模板（中/英）
+
+验收：
+- 用户必须勾选全部 7 项免责声明方可进入系统
+- 4 题诊断自动路由 H1/H2/H3，"只想自动赚钱"用户被拒绝
+- 第 7 天/第 14 天反馈表单可提交，汇总页可查看
+- 邀请 token 机制：无效/缺失返回 403，有效 token 写入 cookie 后无需重复携带
+- 19/19 Web UI smoke tests 通过（含 4 个 invite token gate 测试）
+
+状态：已完成（2026-06-22）。
+
+实现复核：
+- `uv run python scripts/test_web_ui_smoke.py` → 19/19 passed。
+- `git log --oneline` → 3 个 commit：onboarding 系统 + invite token gate + invite email template。
+- Token 列表：`VFmDwizfH8kkj3Gz09lq_A`（pilot-01）、`cfIPwHmW0G9rjm4rDQuHBA`（pilot-02）、`AlLg1MjVVC0a6SuY-4EGOA`（pilot-03）、`IjDV09cbRTk_NCw7VKZpXQ`（pilot-04）、`Jlww1D1kOwJEfz4oDSkJgA`（pilot-05）
+
+环境变量配置：
+```bash
+export HERMASS_M3_INVITE_TOKENS="VFmDwizfH8kkj3Gz09lq_A,cfIPwHmW0G9rjm4rDQuHBA,AlLg1MjVVC0a6SuY-4EGOA,IjDV09cbRTk_NCw7VKZpXQ,Jlww1D1kOwJEfz4oDSkJgA"
+```
+
+下一轮任务：
+- Kimi：5 人目标用户画像和合规邀请话术
+- Qoder：review 分层诊断问题集，确认路由逻辑无偏差
+- Codex：启动 pilot 后每日检查 audit_db onboarding 记录
+
 ### C3: Phase 1 API 与预览
 
 交付：

@@ -115,7 +115,7 @@ class NLToDSLParser:
             )
 
         # State hex in: D1状态属于...
-        state_match = re.search(r"(MN1|W1|D1)状态属于([0-9a-zA-Z、或]+)", nl)
+        state_match = re.search(r"(MN1|W1|D1)状态属于([0-9a-zA-Z_、或]+)", nl)
         if state_match:
             timeframe = state_match.group(1)
             values_str = state_match.group(2)

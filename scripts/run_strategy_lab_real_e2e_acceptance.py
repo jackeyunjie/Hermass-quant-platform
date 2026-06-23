@@ -36,7 +36,7 @@ VALID_SAMPLES = [
     {
         "sample_id": "sample_state_volume_stop_8_take_15",
         "natural_language": (
-            "D1状态属于0x21或0x23，成交量放大到20日均量1.5倍以上买入，"
+            "D1状态属于trending_up或bottoming，成交量放大到20日均量1.5倍以上买入，"
             "止损8%，止盈15%"
         ),
         "expected_entry": ["state_hex_in", "volume_ratio"],
@@ -45,10 +45,10 @@ VALID_SAMPLES = [
     {
         "sample_id": "sample_ma_state_limit_filter",
         "natural_language": (
-            "MA5上穿MA20且D1状态EF数量不少于2时买入，排除涨停股票，"
+            "MA5上穿MA20且D1状态属于trending_up时买入，排除涨停股票，"
             "跌破MA10或止损8%卖出"
         ),
-        "expected_entry": ["ma_golden_cross", "state_ef_count"],
+        "expected_entry": ["ma_golden_cross", "state_hex_in"],
         "expected_exit": ["price_cross_ma", "stop_loss_pct"],
     },
 ]

@@ -16,7 +16,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from hermass_platform.strategy_lab.audit import StrategyAuditLogger
@@ -175,7 +175,7 @@ def _compute_diagnosis(answers: dict[str, str]) -> DiagnosisResult:
 
 
 @router.get("/")
-async def disclaimer(request: Request) -> "TemplateResponse":
+async def disclaimer(request: Request) -> HTMLResponse:
     """Show the M3 pilot disclaimer/consent form."""
     token = _verify_invite_token(request)
     response = templates.TemplateResponse(
@@ -234,7 +234,7 @@ async def consent(
 
 
 @router.get("/diagnosis")
-async def diagnosis_form(request: Request) -> "TemplateResponse":
+async def diagnosis_form(request: Request) -> HTMLResponse:
     """Show the H1/H2/H3 diagnosis questionnaire."""
     _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
@@ -293,7 +293,7 @@ async def diagnosis_submit(
 async def result(
     request: Request,
     level: str = "H1",
-) -> "TemplateResponse":
+) -> HTMLResponse:
     """Show the recommended entry point and first-experience guidance."""
     _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
@@ -348,7 +348,7 @@ async def result(
 
 
 @router.get("/not-suitable")
-async def not_suitable(request: Request) -> "TemplateResponse":
+async def not_suitable(request: Request) -> HTMLResponse:
     """Show a polite rejection page for users who expect investment advice."""
     _verify_invite_token(request)
     trace_id = request.cookies.get("onboarding_trace_id")
@@ -478,7 +478,7 @@ async def feedback_submit(
 async def feedback_summary(
     request: Request,
     day: int | None = None,
-) -> "TemplateResponse":
+) -> HTMLResponse:
     """Simple ops summary of feedback submissions (no auth in M3)."""
     _verify_invite_token(request)
     logger = _audit_logger()

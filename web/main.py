@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Any
@@ -81,7 +82,7 @@ def _readiness_context() -> dict[str, Any]:
 
 
 @app.get("/")
-async def index(request: Request) -> "TemplateResponse":
+async def index(request: Request) -> HTMLResponse:
     """Project landing page."""
     context: dict[str, Any] = {
         "request": request,

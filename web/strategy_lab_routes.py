@@ -15,6 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Form, Query, Request
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from hermass_platform.strategy_lab.api_models import (
@@ -228,7 +229,7 @@ def _validation_result_to_response(
 # ---------------------------------------------------------------------------
 
 @router.get("/structuring")
-async def structuring_page(request: Request) -> "TemplateResponse":
+async def structuring_page(request: Request) -> HTMLResponse:
     """Render the strategy structuring form."""
     return templates.TemplateResponse(
         request,
@@ -253,7 +254,7 @@ async def structuring_submit(
     request: Request,
     strategy_id: str = Form(...),
     natural_language: str = Form(...),
-) -> "TemplateResponse":
+) -> HTMLResponse:
     """Parse NL to DSL, validate, save version, log audit."""
     trace_id = str(uuid4())
     dsl: dict[str, Any] | None = None
@@ -346,7 +347,7 @@ async def structuring_submit(
 async def diagnosis_page(
     request: Request,
     trace_id: str | None = Query(None),
-) -> "TemplateResponse":
+) -> HTMLResponse:
     """Render the diagnosis form, optionally preloaded by trace_id."""
     dsl_snapshot: dict[str, Any] | None = None
     backtest_summary: dict[str, Any] | None = None
@@ -390,7 +391,7 @@ async def diagnosis_run(
     start_date: str = Form("2023-01-01"),
     end_date: str = Form("2024-12-31"),
     stage: str = Form(...),  # "preview" or "backtest"
-) -> "TemplateResponse":
+) -> HTMLResponse:
     """Run preview or backtest for a previously saved strategy."""
     errors: list[str] = []
     preview: dict[str, Any] | None = None
@@ -540,7 +541,7 @@ async def diagnosis_run(
 async def evidence_page(
     request: Request,
     trace_id: str | None = Query(None),
-) -> "TemplateResponse":
+) -> HTMLResponse:
     """Render audit timeline and stored trade evidence for a trace_id."""
     errors: list[str] = []
     audit_records: list[dict[str, Any]] = []

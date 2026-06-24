@@ -242,6 +242,24 @@ def _validation_result_to_response(
 
 
 # ---------------------------------------------------------------------------
+# Page 0: Visual Strategy Builder (React Node-based)
+# ---------------------------------------------------------------------------
+
+@router.get("/builder")
+async def builder_page(request: Request) -> HTMLResponse:
+    """Render the visual strategy builder page."""
+    auth = _require_auth_or_redirect(request)
+    if isinstance(auth, RedirectResponse):
+        return auth
+
+    return templates.TemplateResponse(
+        request,
+        "strategy_builder.html",
+        _ctx(request),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Page 1: Strategy Structuring
 # ---------------------------------------------------------------------------
 

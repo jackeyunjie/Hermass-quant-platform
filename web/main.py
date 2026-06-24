@@ -57,6 +57,11 @@ app = FastAPI(
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# Strategy builder React app
+builder_dir = Path(__file__).parent / "react-strategy-builder" / "dist"
+if builder_dir.exists():
+    app.mount("/static/strategy-builder", StaticFiles(directory=str(builder_dir)), name="strategy-builder")
+
 # Templates
 templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))

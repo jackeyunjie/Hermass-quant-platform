@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hermass 策略构建器 - SQX Builder</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #333; font-size: 13px; }
+        .app-header { background: #2c3e50; color: white; padding: 0 20px; height: 50px; display: flex; align-items: center; justify-content: space-between; }
+        .app-header .brand { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .app-header nav { display: flex; gap: 4px; }
+        .app-header nav a { color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; }
+        .app-header nav a:hover, .app-header nav a.active { color: white; background: rgba(255,255,255,0.1); }
+        .builder-wrapper { display: flex; height: calc(100vh - 50px); }
+        .sidebar-left { width: 60px; background: #34495e; display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 8px; }
+        .sidebar-left .step-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; color: rgba(255,255,255,0.5); position: relative; }
+        .sidebar-left .step-icon:hover { color: white; background: rgba(255,255,255,0.1); }
+        .sidebar-left .step-icon.active { color: white; background: #3498db; }
+        .sidebar-left .step-icon::after { content: attr(data-label); position: absolute; left: 50px; background: #2c3e50; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; opacity: 0; transition: opacity 0.2s; z-index: 100; }
+        .sidebar-left .step-icon:hover::after { opacity: 1; }
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .top-tabs { display: flex; background: white; border-bottom: 1px solid #ddd; padding: 0 20px; height: 40px; align-items: flex-end; }
+        .top-tab { padding: 8px 20px; border: none; background: none; cursor: pointer; font-size: 13px; color: #666; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .top-tab:hover { color: #333; background: #f8f9fa; }
+        .top-tab.active { color: #3498db; border-bottom-color: #3498db; font-weight: 600; }
+        .tab-panels { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 80px; }
+        .panel-title { font-size: 16px; font-weight: 600; color: #2c3e50; margin-bottom: 4px; }
+        .panel-desc { font-size: 12px; color: #7f8c8d; margin-bottom: 20px; }
+        .card { background: white; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 16px; overflow: hidden; }
+        .card-header { background: #f8f9fa; padding: 12px 16px; font-weight: 600; font-size: 14px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; gap: 8px; }
+        .card-body { padding: 16px; }
+        .form-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+        .form-row:last-child { margin-bottom: 0; }
+        .form-label { min-width: 140px; font-size: 13px; color: #555; }
+        .form-input, .form-select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        .form-input:focus, .form-select:focus { outline: none; border-color: #3498db; }
+        .radio-group, .checkbox-group { display: flex; flex-direction: column; gap: 8px; }
+        .radio-item, .checkbox-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 4px; cursor: pointer; }
+        .radio-item:hover, .checkbox-item:hover { background: #f8f9fa; }
+        .radio-item .label, .checkbox-item .label { font-weight: 500; font-size: 13px; }
+        .radio-item .desc, .checkbox-item .desc { font-size: 11px; color: #7f8c8d; margin-top: 2px; }
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 22px; transition: 0.3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: #3498db; }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); }
+        .range-slider { display: flex; align-items: center; gap: 10px; }
+        .range-value { min-width: 50px; text-align: center; font-weight: 600; color: #3498db; }
+        .blocks-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .blocks-table th { background: #f0f2f5; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; position: sticky; top: 0; }
+        .blocks-table td { padding: 6px 12px; border-bottom: 1px solid #eee; }
+        .blocks-table tr:hover { background: #f8f9fa; }
+        .block-category-header { background: #e8f4f8 !important; font-weight: 600; }
+        .section-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 16px; color: #7f8c8d; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .section-divider::before, .section-divider::after { content: ""; flex: 1; height: 1px; background: #ddd; }
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 1200px) { .two-col { grid-template-columns: 1fr; } }
+        .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        @media (max-width: 1400px) { .three-col { grid-template-columns: 1fr 1fr; } }
+        .data-range-bar { display: flex; height: 30px; border-radius: 4px; overflow: hidden; margin: 10px 0; border: 1px solid #ddd; }
+        .range-segment { display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; font-weight: 600; }
+        .range-is { background: #3498db; }
+        .range-oos { background: #2ecc71; }
+        .action-bar { position: fixed; bottom: 0; left: 60px; right: 0; background: white; border-top: 1px solid #ddd; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
+        .btn { padding: 8px 20px; border-radius: 4px; border: 1px solid #ccc; background: white; cursor: pointer; font-size: 13px; }
+        .btn-primary { background: #3498db; color: white; border-color: #3498db; }
+        .btn-success { background: #2ecc71; color: white; border-color: #2ecc71; }
+        .btn-group { display: flex; gap: 8px; }
+        .table-scroll { max-height: 400px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 4px; }
+        .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .status-badge.enabled { background: #d4edda; color: #155724; }
+        .status-badge.disabled { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <header class="app-header">
+        <div class="brand"><span style="font-size:22px">🏗️</span><span>Hermass 策略构建器</span></div>
+        <nav>
+            <a href="/">首页</a>
+            <a href="/strategy-lab/structuring" class="active">策略构建</a>
+            <a href="/strategy-lab/diagnosis">诊断</a>
+            <a href="/strategy-lab/evidence">证据</a>
+        </nav>
+    </header>
+
+    <div class="builder-wrapper">
+        <aside class="sidebar-left">
+            <div class="step-icon active" data-step="1" data-label="构建配置" onclick="switchMainTab("build")">⚙️</div>
+            <div class="step-icon" data-step="2" data-label="数据设置" onclick="switchMainTab("data")">📊</div>
+            <div class="step-icon" data-step="3" data-label="交易选项" onclick="switchMainTab("trading")">💱</div>
+            <div class="step-icon" data-step="4" data-label="构建模块" onclick="switchMainTab("blocks")">🧩</div>
+            <div class="step-icon" data-step="5" data-label="资金管理" onclick="switchMainTab("money")">💰</div>
+            <div class="step-icon" data-step="6" data-label="稳健性检验" onclick="switchMainTab("robust")">🛡️</div>
+            <div class="step-icon" data-step="7" data-label="排名设置" onclick="switchMainTab("ranking")">🏆</div>
+        </aside>
+
+        <div class="main-content">
+            <div class="top-tabs" id="topTabs"></div>
+            <div class="tab-panels" id="tabPanels"></div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <div class="btn-group">
+            <button class="btn" onclick="resetBuilder()">🔄 重置</button>
+            <button class="btn" onclick="loadTemplate()">📋 加载模板</button>
+        </div>
+        <div class="btn-group">
+            <span id="configSummary" style="color:#7f8c8d;font-size:12px;margin-right:16px"></span>
+            <button class="btn btn-primary" onclick="previewStrategy()">👁️ 预览条件</button>
+            <button class="btn btn-success" onclick="runBacktest()">▶️ 运行回测</button>
+        </div>
+    </div>
+
+<script>
+// SQX Builder State
+const builderState = {
+    strategyType: "simple",
+    tradingDirection: "both",
+    strategyStyle: "fuzzy_logic",
+    buildMode: "genetic",
+    genetic: { maxGenerations: 100, populationSize: 100, crossoverProb: 0.83, mutationProb: 0.31, islands: 7, migrateEvery: 83, migrationRate: 0.07, freshBloodEnabled: true, freshBloodReplacePct: 10, freshBloodEvery: 3, restartOnFinish: true, restartStagnation: 30 },
+    data: { engine: "metatrader4", symbol: "USA500IDXUSD", timeframe: "H1", startDate: "2023-11-01", endDate: "2024-12-31", subcharts: [{symbol:"USA500IDXUSD",timeframe:"Monthly"}], precision: "selected_timeframe", spread: 100, slippage: 9, minDistance: 10, commissions: "none", dataParts: [{label:"ISV1",type:"in_sample",start:"2023-11-01",end:"2024-12-18",pct:96},{label:"OOS1",type:"out_of_sample",start:"2024-12-18",end:"2024-12-31",pct:3}] },
+    trading: { noWeekendTrading: true, fridayCloseTime: "00:38", sundayOpenTime: "00:38", exitAtEndOfDay: false, endOfDayExitTime: "23:04", exitOnFriday: false, fridayExitTime: "20:40", limitTimeRange: false, timeRangeFrom: "08:00", timeRangeTo: "16:00", exitAtEndOfRange: false, orderTypesToClose: "all", maxDistanceFromMarket: false, maxDistancePct: 6, maxTradesPerDay: 0, minSL: 0, maxSL: 0, minPT: 0, maxPT: 0, realisticGaps: false },
+    blocks: { signals: {}, indicators: {}, stopLimitEntry: {}, orderTypes: {market:{enabled:true,weight:1},stop:{enabled:true,weight:1},limit:{enabled:false,weight:1}}, exitTypes: {exitAfterBars:{enabled:true,required:false},moveSL2BE:{enabled:false,required:false},profitTarget:{enabled:true,required:true},stopLoss:{enabled:true,required:true},trailingStop:{enabled:true,required:false},trailingActivation:{enabled:true,required:false},exitRule:{enabled:true,required:false}}, externalIndicators: {} },
+    money: { initialCapital: 1000000, method: "risk_fixed_pct", riskPct: 1, sizeDecimals: 1, maxLots: 20, sizeIfNoMM: 0.2 },
+    robustness: { disableAll: false, basic: {whatIf:{enabled:false},monteCarloTrades:{enabled:true},higherPrecision:{enabled:false}}, standard: {additionalMarkets:{enabled:false},monteCarloRetest:{enabled:true},sequentialOptimization:{enabled:true}}, extensive: {optProfile:{enabled:false},walkForward:{enabled:true},walkForwardMatrix:{enabled:true}} },
+    ranking: { maxStrategies: 3400, stopGeneration: "databank_full", fitness: "net_profit", autoFilters: [{enabled:true,metric:"profit_factor",operator:">",value:1},{enabled:true,metric:"ret_dd_ratio",operator:">",value:3},{enabled:true,metric:"sqn",operator:">",value:0.3},{enabled:true,metric:"num_trades",operator:">",value:10},{enabled:false,metric:"stagnation",operator:"<",value:70}] },
+    notes: ""
+};
+
+const tabConfig = {
+    build: [{id:"what-to-build",label:"What to build"},{id:"genetic-options",label:"Genetic options"}],
+    data: [{id:"data-settings",label:"Data"}],
+    trading: [{id:"trading-options",label:"Trading options"}],
+    blocks: [{id:"building-blocks",label:"Building blocks"}],
+    money: [{id:"money-management",label:"Money management"}],
+    robust: [{id:"cross-checks",label:"Cross checks"}],
+    ranking: [{id:"ranking-settings",label:"Ranking"},{id:"notes",label:"Notes"}]
+};
+
+let currentMainTab = "build";
+let currentSubTab = "what-to-build";
+
+document.addEventListener("DOMContentLoaded", function() {
+    renderTabs();
+    renderPanels();
+    updateSummary();
+});
+
+function switchMainTab(tab) {
+    currentMainTab = tab;
+    const tabs = tabConfig[tab];
+    if (tabs && tabs.length > 0) currentSubTab = tabs[0].id;
+    document.querySelectorAll(".sidebar-left .step-icon").forEach(icon => {
+        icon.classList.remove("active");
+        if ((tab === "build" && icon.dataset.step === "1") ||
+            (tab === "data" && icon.dataset.step === "2") ||
+            (tab === "trading" && icon.dataset.step === "3") ||
+            (tab === "blocks" && icon.dataset.step === "4") ||
+            (tab === "money" && icon.dataset.step === "5") ||
+            (tab === "robust" && icon.dataset.step === "6") ||
+            (tab === "ranking" && icon.dataset.step === "7")) {
+            icon.classList.add("active");
+        }
+    });
+    renderTabs();
+    renderPanels();
+}
+
+function switchSubTab(tabId) {
+    currentSubTab = tabId;
+    renderTabs();
+    renderPanels();
+}
+
+function renderTabs() {
+    const container = document.getElementById("topTabs");
+    const tabs = tabConfig[currentMainTab] || [];
+    container.innerHTML = tabs.map(tab =>
+        '<button class="top-tab ' + (tab.id === currentSubTab ? "active" : "") + '" onclick="switchSubTab(\'' + tab.id + '\')">' + tab.label + '</button>'
+    ).join("");
+}
+
+function renderPanels() {
+    const container = document.getElementById("tabPanels");
+    container.innerHTML = "";
+    switch (currentSubTab) {
+        case "what-to-build": container.innerHTML = renderWhatToBuild(); break;
+        case "genetic-options": container.innerHTML = renderGeneticOptions(); break;
+        case "data-settings": container.innerHTML = renderDataSettings(); break;
+        case "trading-options": container.innerHTML = renderTradingOptions(); break;
+        case "building-blocks": container.innerHTML = renderBuildingBlocks(); break;
+        case "money-management": container.innerHTML = renderMoneyManagement(); break;
+        case "cross-checks": container.innerHTML = renderCrossChecks(); break;
+        case "ranking-settings": container.innerHTML = renderRankingSettings(); break;
+        case "notes": container.innerHTML = renderNotes(); break;
+    }
+}
+
+function renderWhatToBuild() {
+    return '<div class="panel-title">What to build</div><div class="panel-desc">选择策略类型、风格、构建模式、条件数量和止损/止盈范围</div>' +
+        '<div class="card"><div class="card-header">🎯 策略类型 (Strategy type)</div><div class="card-body">' +
+        '<div class="radio-group">' +
+        '<label class="radio-item"><input type="radio" name="strategy_type" value="simple" ' + (builderState.strategyType === "simple" ? "checked" : "") + ' onchange="updateState(\'strategyType\',this.value)"><div><div class="label">简单策略 (Simple strategy) [默认]</div><div class="desc">在单一品种和单一时间周期上运行的简单策略</div></div></label>' +
+        '<label class="radio-item"><input type="radio" name="strategy_type" value="multi_tf" ' + (builderState.strategyType === "multi_tf" ? "checked" : "") + ' onchange="updateState(\'strategyType\',this.value)"><div><div class="label">多周期或多品种策略</div><div class="desc">策略查看主图表和额外图表。仅在主图表上交易。</div></div></label>' +
+        '<label class="radio-item"><input type="radio" name="strategy_type" value="template" ' + (builderState.strategyType === "template" ? "checked" : "") + ' onchange="updateState(\'strategyType\',this.value)"><div><div class="label">从模板创建</div><div class="desc">从现有模板创建策略</div></div></label>' +
+        '<label class="radio-item"><input type="radio" name="strategy_type" value="improve" ' + (builderState.strategyType === "improve" ? "checked" : "") + ' onchange="updateState(\'strategyType\',this.value)"><div><div class="label">改进现有策略</div><div class="desc">改进现有策略的某些部分</div></div></label>' +
+        '</div></div></div>' +
+        '<div class="card"><div class="card-header">⚙️ 额外构建配置</div><div class="card-body">' +
+        '<div class="form-row"><label class="form-label">交易方向</label><select class="form-select" onchange="updateState(\'tradingDirection\',this.value)"><option value="both" ' + (builderState.tradingDirection === "both" ? "selected" : "") + '>Both (Long & Short)</option><option value="long_only">Long Only</option><option value="short_only">Short Only</option></select></div>' +
+        '<div class="form-row"><label class="form-label">策略风格</label><select class="form-select" onchange="updateState(\'strategyStyle\',this.value)"><option value="fuzzy_logic" ' + (builderState.strategyStyle === "fuzzy_logic" ? "selected" : "") + '>SQX Signals with Fuzzy Logic</option><option value="strict">Strict Logic</option></select></div>' +
+        '<div class="form-row"><label class="form-label">构建模式</label><select class="form-select" onchange="updateState(\'buildMode\',this.value)"><option value="genetic" ' + (builderState.buildMode === "genetic" ? "selected" : "") + '>Genetic evolution</option><option value="random">Random generation</option><option value="brute_force">Brute force</option></select></div>' +
+        '<div class="form-row"><label class="form-label">止损</label><span class="status-badge enabled">Required, Indicator based</span></div>' +
+        '<div class="form-row"><label class="form-label">止盈</label><span class="status-badge enabled">Required, Pips based: 1-10</span></div>' +
+        '</div></div>';
+}
+
+function renderGeneticOptions() {
+    var g = builderState.genetic;
+    return '<div class="panel-title">Genetic options</div><div class="panel-desc">配置遗传算法参数，控制策略进化过程</div>' +
+        '<div class="two-col">' +
+        '<div class="card"><div class="card-header">🧬 遗传选项</div><div class="card-body">' +
+        '<div class="form-row"><label class="form-label">最大代数</label><input type="number" class="form-input" value="' + g.maxGenerations + '" min="10" max="1000" onchange="updateGenetic(\'maxGenerations\',parseInt(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">种群大小</label><input type="number" class="form-input" value="' + g.populationSize + '" min="10" max="1000" onchange="updateGenetic(\'populationSize\',parseInt(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">交叉概率</label><div class="range-slider"><input type="range" min="0" max="100" value="' + Math.round(g.crossoverProb * 100) + '" oninput="updateGenetic(\'crossoverProb\',this.value/100);this.nextElementSibling.textContent=this.value+\'%\'"><span class="range-value">' + Math.round(g.crossoverProb * 100) + '%</span></div></div>' +
+        '<div class="form-row"><label class="form-label">变异概率</label><div class="range-slider"><input type="range" min="0" max="100" value="' + Math.round(g.mutationProb * 100) + '" oninput="updateGenetic(\'mutationProb\',this.value/100);this.nextElementSibling.textContent=this.value+\'%\'"><span class="range-value">' + Math.round(g.mutationProb * 100) + '%</span></div></div>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">🏝️ 岛屿选项</div><div class="card-body">' +
+        '<div class="form-row"><label class="form-label">岛屿数量</label><input type="number" class="form-input" value="' + g.islands + '" min="1" max="20" onchange="updateGenetic(\'islands\',parseInt(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">迁移频率</label><input type="number" class="form-input" value="' + g.migrateEvery + '" min="1" max="200" onchange="updateGenetic(\'migrateEvery\',parseInt(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">迁移率</label><div class="range-slider"><input type="range" min="0" max="50" value="' + Math.round(g.migrationRate * 100) + '" oninput="updateGenetic(\'migrationRate\',this.value/100);this.nextElementSibling.textContent=this.value+\'%\'"><span class="range-value">' + Math.round(g.migrationRate * 100) + '%</span></div></div>' +
+        '</div></div>' +
+        '</div>' +
+        '<div class="two-col">' +
+        '<div class="card"><div class="card-header">🩸 新鲜血液</div><div class="card-body">' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (g.freshBloodEnabled ? "checked" : "") + ' onchange="updateGenetic(\'freshBloodEnabled\',this.checked)"><span class="toggle-slider"></span></label><span>检测相似策略并替换</span></div>' +
+        '<div class="form-row"><label class="form-label">替换比例</label><input type="number" class="form-input" value="' + g.freshBloodReplacePct + '" min="1" max="50" onchange="updateGenetic(\'freshBloodReplacePct\',parseInt(this.value))"> %</div>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">�� 进化管理</div><div class="card-body">' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (g.restartOnFinish ? "checked" : "") + ' onchange="updateGenetic(\'restartOnFinish\',this.checked)"><span class="toggle-slider"></span></label><span>完成后重新开始</span></div>' +
+        '<div class="form-row"><label class="form-label">停滞重启</label><span>适应度停滞 <input type="number" class="form-input" style="width:60px" value="' + g.restartStagnation + '" min="5" max="100" onchange="updateGenetic(\'restartStagnation\',parseInt(this.value))"> 代则重启</span></div>' +
+        '</div></div>' +
+        '</div>';
+}
+
+function renderDataSettings() {
+    var d = builderState.data;
+    var subchartsHtml = "";
+    for (var i = 0; i < d.subcharts.length; i++) {
+        var sub = d.subcharts[i];
+        subchartsHtml += '<div class="form-row"><label class="form-label">Subchart ' + (i+1) + '</label><select class="form-select" onchange="updateSubchart(' + i + ',\'symbol\',this.value)"><option value="USA500IDXUSD" ' + (sub.symbol==="USA500IDXUSD"?"selected":"") + '>USA500IDXUSD</option><option value="USATECHIDXUSD" ' + (sub.symbol==="USATECHIDXUSD"?"selected":"") + '>USATECHIDXUSD</option></select><select class="form-select" onchange="updateSubchart(' + i + ',\'timeframe\',this.value)"><option value="Monthly" ' + (sub.timeframe==="Monthly"?"selected":"") + '>Monthly</option><option value="Weekly" ' + (sub.timeframe==="Weekly"?"selected":"") + '>Weekly</option><option value="Daily" ' + (sub.timeframe==="Daily"?"selected":"") + '>Daily</option><option value="H4" ' + (sub.timeframe==="H4"?"selected":"") + '>H4</option><option value="H1" ' + (sub.timeframe==="H1"?"selected":"") + '>H1</option></select><button class="btn" onclick="removeSubchart(' + i + ')" style="padding:4px 8px;font-size:11px">删除</button></div>';
+    }
+    var dataPartsHtml = "";
+    var rangeBarHtml = "";
+    for (var j = 0; j < d.dataParts.length; j++) {
+        var part = d.dataParts[j];
+        dataPartsHtml += '<div class="form-row"><input type="text" class="form-input" value="' + part.label + '" style="width:60px" onchange="updateDataPart(' + j + ',\'label\',this.value)"><select class="form-select" onchange="updateDataPart(' + j + ',\'type\',this.value)"><option value="in_sample" ' + (part.type==="in_sample"?"selected":"") + '>In sample</option><option value="out_of_sample" ' + (part.type==="out_of_sample"?"selected":"") + '>Out of sample</option></select><input type="date" class="form-input" value="' + part.start + '" onchange="updateDataPart(' + j + ',\'start\',this.value)"><input type="date" class="form-input" value="' + part.end + '" onchange="updateDataPart(' + j + ',\'end\',this.value)"><span style="color:#7f8c8d">(' + part.pct + '%)</span><button class="btn" onclick="removeDataPart(' + j + ')" style="padding:4px 8px;font-size:11px">删除</button></div>';
+        rangeBarHtml += '<div class="range-segment ' + (part.type === "in_sample" ? "range-is" : "range-oos") + '" style="width:' + part.pct + '%">' + part.label + ' ' + part.pct + '%</div>';
+    }
+    return '<div class="panel-title">Data</div><div class="panel-desc">配置交易引擎、品种、时间周期和回测数据范围</div>' +
+        '<div class="card"><div class="card-header">🔧 交易引擎</div><div class="card-body"><div class="form-row"><label class="form-label">引擎</label><select class="form-select" onchange="updateData(\'engine\',this.value)"><option value="metatrader4" ' + (d.engine==="metatrader4"?"selected":"") + '>MetaTrader4</option><option value="metatrader5" ' + (d.engine==="metatrader5"?"selected":"") + '>MetaTrader5</option><option value="cTrader" ' + (d.engine==="cTrader"?"selected":"") + '>cTrader</option></select></div></div></div>' +
+        '<div class="card"><div class="card-header">📈 回测数据设置</div><div class="card-body">' +
+        '<div class="two-col"><div><div class="form-row"><label class="form-label">主图表</label><select class="form-select" onchange="updateData(\'symbol\',this.value)"><option value="USA500IDXUSD" ' + (d.symbol==="USA500IDXUSD"?"selected":"") + '>USA500IDXUSD</option><option value="EURUSD">EURUSD</option><option value="GBPUSD">GBPUSD</option><option value="XAUUSD">XAUUSD</option></select></div><div class="form-row"><label class="form-label">开始日期</label><input type="date" class="form-input" value="' + d.startDate + '" onchange="updateData(\'startDate\',this.value)"></div></div>' +
+        '<div><div class="form-row"><label class="form-label">时间周期</label><select class="form-select" onchange="updateData(\'timeframe\',this.value)"><option value="M1" ' + (d.timeframe==="M1"?"selected":"") + '>M1</option><option value="M5" ' + (d.timeframe==="M5"?"selected":"") + '>M5</option><option value="M15" ' + (d.timeframe==="M15"?"selected":"") + '>M15</option><option value="M30" ' + (d.timeframe==="M30"?"selected":"") + '>M30</option><option value="H1" ' + (d.timeframe==="H1"?"selected":"") + '>H1</option><option value="H4" ' + (d.timeframe==="H4"?"selected":"") + '>H4</option><option value="D1" ' + (d.timeframe==="D1"?"selected":"") + '>D1</option><option value="W1" ' + (d.timeframe==="W1"?"selected":"") + '>W1</option><option value="MN1" ' + (d.timeframe==="MN1"?"selected":"") + '>MN1</option></select></div><div class="form-row"><label class="form-label">结束日期</label><input type="date" class="form-input" value="' + d.endDate + '" onchange="updateData(\'endDate\',this.value)"></div></div></div>' +
+        '<div class="section-divider">子图表</div><div id="subcharts-container">' + subchartsHtml + '</div><button class="btn" onclick="addSubchart()" style="margin-top:8px">+ 添加子图表</button>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">🧪 测试参数</div><div class="card-body"><div class="three-col"><div class="form-row"><label class="form-label">精度</label><select class="form-select"><option>Selected timeframe only</option></select></div><div class="form-row"><label class="form-label">点差</label><input type="number" class="form-input" value="' + d.spread + '"> pips</div><div class="form-row"><label class="form-label">滑点</label><input type="number" class="form-input" value="' + d.slippage + '"> pips</div></div></div></div>' +
+        '<div class="card"><div class="card-header">📅 数据分段</div><div class="card-body"><div class="data-range-bar">' + rangeBarHtml + '</div><div id="data-parts-container">' + dataPartsHtml + '</div><button class="btn" onclick="addDataPart()" style="margin-top:8px">+ 添加数据段</button></div></div>';
+}
+
+function renderTradingOptions() {
+    var t = builderState.trading;
+    return '<div class="panel-title">Trading options</div><div class="panel-desc">交易选项定义策略行为并影响策略何时以及如何交易</div>' +
+        '<div class="card"><div class="card-header">💱 构建和交易选项</div><div class="card-body">' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (t.noWeekendTrading?"checked":"") + ' onchange="updateTrading(\'noWeekendTrading\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">周末不交易</span></div>' +
+        '<div class="form-row"><label class="form-label">周五收盘时间</label><input type="text" class="form-input" value="' + t.fridayCloseTime + '" onchange="updateTrading(\'fridayCloseTime\',this.value)"></div>' +
+        '<div class="form-row"><label class="form-label">周日开盘时间</label><input type="text" class="form-input" value="' + t.sundayOpenTime + '" onchange="updateTrading(\'sundayOpenTime\',this.value)"></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (t.exitAtEndOfDay?"checked":"") + ' onchange="updateTrading(\'exitAtEndOfDay\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">日终出场</span></div>' +
+        '<div class="form-row"><label class="form-label">日终出场时间</label><input type="text" class="form-input" value="' + t.endOfDayExitTime + '" onchange="updateTrading(\'endOfDayExitTime\',this.value)"></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (t.exitOnFriday?"checked":"") + ' onchange="updateTrading(\'exitOnFriday\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">周五出场</span></div>' +
+        '<div class="form-row"><label class="form-label">周五出场时间</label><input type="text" class="form-input" value="' + t.fridayExitTime + '" onchange="updateTrading(\'fridayExitTime\',this.value)"></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (t.limitTimeRange?"checked":"") + ' onchange="updateTrading(\'limitTimeRange\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">限制时间范围</span></div>' +
+        '<div class="form-row"><label class="form-label">时间范围从</label><input type="text" class="form-input" value="' + t.timeRangeFrom + '" onchange="updateTrading(\'timeRangeFrom\',this.value)"> 到 <input type="text" class="form-input" value="' + t.timeRangeTo + '" onchange="updateTrading(\'timeRangeTo\',this.value)"></div>' +
+        '<div class="form-row"><label class="form-label">最大距离%</label><input type="number" class="form-input" value="' + t.maxDistancePct + '" onchange="updateTrading(\'maxDistancePct\',parseInt(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">每日最大交易</label><input type="number" class="form-input" value="' + t.maxTradesPerDay + '" onchange="updateTrading(\'maxTradesPerDay\',parseInt(this.value))"></div>' +
+        '</div></div>';
+}
+
+function renderBuildingBlocks() {
+    return '<div class="panel-title">Building blocks</div><div class="panel-desc">选择用于生成每个策略的构建模块。可通过增加权重影响选择概率。</div>' +
+        '<div class="card"><div class="card-header">📶 Signals (预定义条件)</div><div class="card-body">' +
+        '<div class="table-scroll"><table class="blocks-table"><thead><tr><th class="checkbox-col"><input type="checkbox"></th><th>Use</th><th>Weight</th><th>Parameters</th></tr></thead><tbody>' +
+        '<tr class="block-category-header"><td colspan="4">ADX - Average Directional Movement Index</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ADX changes direction downwards</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ADX changes direction upwards</td><td class="weight-col"><input type="number" value="3"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ADX crosses above Level</td><td class="weight-col"><input type="number" value="3"></td><td class="params-col">Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ADX crosses below Level</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ADX is falling</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ADX is higher than Level</td><td class="weight-col"><input type="number" value="3"></td><td class="params-col">Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ADX is lower than Level</td><td class="weight-col"><input type="number" value="3"></td><td class="params-col">Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ADX is rising</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr class="block-category-header"><td colspan="4">ATR - Average True Range</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ATR changes direction downwards</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ATR changes direction upwards</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ATR crosses above Level</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>ATR crosses below Level</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Custom</td></tr>' +
+        '<tr class="block-category-header"><td colspan="4">Bollinger Bands</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>BB breaks above upper band</td><td class="weight-col"><input type="number" value="3"></td><td class="params-col">Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>BB breaks below lower band</td><td class="weight-col"><input type="number" value="3"></td><td class="params-col">Custom</td></tr>' +
+        '<tr class="block-category-header"><td colspan="4">RSI - Relative Strength Index</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>RSI crosses above 70</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>RSI crosses below 30</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>RSI is above level</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>RSI is below level</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Custom</td></tr>' +
+        '<tr class="block-category-header"><td colspan="4">MACD</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>MACD bullish cross</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>MACD bearish cross</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr class="block-category-header"><td colspan="4">Moving Average</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>MA Golden Cross</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>MA Death Cross</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>Price above MA</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>MA Bullish Alignment</td><td class="weight-col"><input type="number" value="1"></td><td class="params-col">Default</td></tr>' +
+        '</tbody></table></div>' +
+        '</div></div>' +
+        '<div class="two-col">' +
+        '<div class="card"><div class="card-header">📋 Order Types</div><div class="card-body">' +
+        '<table class="blocks-table"><thead><tr><th class="checkbox-col">Use</th><th>Type</th><th>Weight</th><th>Parameters</th></tr></thead><tbody>' +
+        '<tr><td class="checkbox-col"><input type="checkbox"></td><td>All</td><td class="weight-col"><input type="number" value="1"></td><td>Reset to default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>(MKT) Enter at market</td><td class="weight-col"><input type="number" value="1"></td><td>Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>(STOP) Enter at stop</td><td class="weight-col"><input type="number" value="1"></td><td>Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox"></td><td>(LMT) Enter at limit</td><td class="weight-col"><input type="number" value="1"></td><td>Custom</td></tr>' +
+        '</tbody></table></div></div>' +
+        '<div class="card"><div class="card-header">🚪 Exit Types</div><div class="card-body">' +
+        '<table class="blocks-table"><thead><tr><th class="checkbox-col">Use</th><th>Type</th><th>Required</th><th>Parameters</th></tr></thead><tbody>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>Exit After Bars</td><td><input type="checkbox"></td><td>Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>Profit Target</td><td><input type="checkbox" checked></td><td>Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>Stop Loss</td><td><input type="checkbox" checked></td><td>Default</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>Trailing Stop</td><td><input type="checkbox"></td><td>Custom</td></tr>' +
+        '<tr><td class="checkbox-col"><input type="checkbox" checked></td><td>Exit Rule</td><td><input type="checkbox"></td><td>Default</td></tr>' +
+        '</tbody></table></div></div>' +
+        '</div>';
+}
+
+function renderMoneyManagement() {
+    var m = builderState.money;
+    return '<div class="panel-title">Money management</div><div class="panel-desc">配置初始资金和期望的仓位管理方法</div>' +
+        '<div class="card"><div class="card-header">💰 初始资金</div><div class="card-body">' +
+        '<div class="form-row"><label class="form-label">Initial capital</label><input type="number" class="form-input" value="' + m.initialCapital + '" onchange="updateMoney(\'initialCapital\',parseInt(this.value))"></div>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">📊 资金管理方法</div><div class="card-body">' +
+        '<div class="radio-group">' +
+        '<label class="radio-item"><input type="radio" name="mm_method" value="fixed_size" ' + (m.method==="fixed_size"?"checked":"") + ' onchange="updateMoney(\'method\',this.value)"><div><div class="label">Fixed size</div></div></label>' +
+        '<label class="radio-item"><input type="radio" name="mm_method" value="crypto_fixed_pct" ' + (m.method==="crypto_fixed_pct"?"checked":"") + ' onchange="updateMoney(\'method\',this.value)"><div><div class="label">Crypto fixed % balance</div></div></label>' +
+        '<label class="radio-item"><input type="radio" name="mm_method" value="risk_fixed_pct" ' + (m.method==="risk_fixed_pct"?"checked":"") + ' onchange="updateMoney(\'method\',this.value)"><div><div class="label">Risk fixed % balance</div><div class="desc">Risk fixed percentage of balance</div></div></label>' +
+        '<label class="radio-item"><input type="radio" name="mm_method" value="fixed_amount" ' + (m.method==="fixed_amount"?"checked":"") + ' onchange="updateMoney(\'method\',this.value)"><div><div class="label">Fixed amount</div></div></label>' +
+        '</div>' +
+        '<div class="section-divider">参数设置</div>' +
+        '<div class="form-row"><label class="form-label">Risk in %</label><input type="number" class="form-input" value="' + m.riskPct + '" step="0.1" onchange="updateMoney(\'riskPct\',parseFloat(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">Size Decimals</label><input type="number" class="form-input" value="' + m.sizeDecimals + '" onchange="updateMoney(\'sizeDecimals\',parseInt(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">Maximum lots</label><input type="number" class="form-input" value="' + m.maxLots + '" onchange="updateMoney(\'maxLots\',parseInt(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">Size if no MM</label><input type="number" class="form-input" value="' + m.sizeIfNoMM + '" step="0.1" onchange="updateMoney(\'sizeIfNoMM\',parseFloat(this.value))"></div>' +
+        '</div></div>';
+}
+
+function renderCrossChecks() {
+    var r = builderState.robustness;
+    return '<div class="panel-title">Cross checks (robustness)</div><div class="panel-desc">如果定义了过滤器，可以自动排除未通过交叉检查的策略 - 创建"策略测试漏斗"</div>' +
+        '<div class="form-row" style="margin-bottom:20px"><label class="toggle-switch"><input type="checkbox" ' + (r.disableAll?"checked":"") + ' onchange="updateRobustness(\'disableAll\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">禁用所有交叉检查</span></div>' +
+        '<div class="card"><div class="card-header">⚡ BASIC (FAST) - 快速检查</div><div class="card-body">' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.basic.whatIf.enabled?"checked":"") + ' onchange="updateRobustnessBasic(\'whatIf\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">What If simulations</span><span style="color:#7f8c8d">N/A</span></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.basic.monteCarloTrades.enabled?"checked":"") + ' onchange="updateRobustnessBasic(\'monteCarloTrades\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">Monte Carlo trades manipulation</span><span style="color:#7f8c8d">2 tests with 200 simulations</span></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.basic.higherPrecision.enabled?"checked":"") + ' onchange="updateRobustnessBasic(\'higherPrecision\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">Higher backtest precision</span><span style="color:#7f8c8d">1 minute tick simulation (slow)</span></div>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">📊 STANDARD (SLOW) - 标准检查</div><div class="card-body">' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.standard.additionalMarkets.enabled?"checked":"") + ' onchange="updateRobustnessStandard(\'additionalMarkets\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">Backtests on additional markets</span><span style="color:#7f8c8d">Retest on USATECHIDXUSD/H1</span></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.standard.monteCarloRetest.enabled?"checked":"") + ' onchange="updateRobustnessStandard(\'monteCarloRetest\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">Monte Carlo retest methods</span><span style="color:#7f8c8d">6 tests with 10 simulations</span></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.standard.sequentialOptimization.enabled?"checked":"") + ' onchange="updateRobustnessStandard(\'sequentialOptimization\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">Sequential Optimization</span><span style="color:#7f8c8d">Distribution: Up 50%, Down 50%, Steps: 50</span></div>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">🐌 EXTENSIVE (SLOWEST) - 深度检查</div><div class="card-body">' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.extensive.optProfile.enabled?"checked":"") + ' onchange="updateRobustnessExtensive(\'optProfile\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">Opt. Profile / Sys. Param. Permutation</span><span style="color:#7f8c8d">Max optimizations: 1000</span></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.extensive.walkForward.enabled?"checked":"") + ' onchange="updateRobustnessExtensive(\'walkForward\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">Walk-Forward Optimization</span><span style="color:#7f8c8d">Out of sample: 20%, runs: 10</span></div>' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (r.extensive.walkForwardMatrix.enabled?"checked":"") + ' onchange="updateRobustnessExtensive(\'walkForwardMatrix\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">Walk-Forward Matrix</span><span style="color:#7f8c8d">Out of sample: 10-40%, runs: 5-20</span></div>' +
+        '</div></div>';
+}
+
+function renderRankingSettings() {
+    var rk = builderState.ranking;
+    return '<div class="panel-title">Ranking</div><div class="panel-desc">定义策略排名计算方式和保存到数据库的策略数量</div>' +
+        '<div class="two-col">' +
+        '<div class="card"><div class="card-header">💾 最大保存策略数</div><div class="card-body">' +
+        '<div class="form-row"><label class="form-label">最大策略数</label><input type="number" class="form-input" value="' + rk.maxStrategies + '" onchange="updateRanking(\'maxStrategies\',parseInt(this.value))"></div>' +
+        '<div class="form-row"><label class="form-label">停止生成</label><select class="form-select" onchange="updateRanking(\'stopGeneration\',this.value)"><option value="databank_full" ' + (rk.stopGeneration==="databank_full"?"selected":"") + '>Databank is full</option><option value="never">Never</option><option value="after_count">After N strategies</option></select></div>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">📊 策略质量排名</div><div class="card-body">' +
+        '<div class="form-row"><label class="form-label">适应度计算</label><select class="form-select" onchange="updateRanking(\'fitness\',this.value)"><option value="net_profit" ' + (rk.fitness==="net_profit"?"selected":"") + '>Net Profit (Return)</option><option value="return_dd">Return / Drawdown ratio</option><option value="sqn">SQN</option><option value="annual_return">Annual Return % / Max DD %</option></select></div>' +
+        '</div></div>' +
+        '</div>' +
+        '<div class="card"><div class="card-header">🔍 策略过滤条件</div><div class="card-body">' +
+        '<div class="form-row" style="font-weight:600;font-size:12px;color:#7f8c8d"><span style="width:30px">启用</span><span style="width:150px">指标</span><span style="width:80px">操作</span><span style="width:60px">值</span></div>' +
+        '<div id="auto-filters">' + rk.autoFilters.map((f, i) =>
+            '<div class="form-row"><input type="checkbox" ' + (f.enabled?"checked":"") + ' onchange="updateAutoFilter(' + i + ',\'enabled\',this.checked)"><span style="width:150px">' + f.metric + '</span><span style="width:80px">' + f.operator + '</span><span style="width:60px">' + f.value + '</span></div>'
+        ).join("") + '</div>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-header">📁 组合过滤</div><div class="card-body">' +
+        '<div class="form-row"><label class="toggle-switch"><input type="checkbox" ' + (rk.portfolioFilter?"checked":"") + ' onchange="updateRanking(\'portfolioFilter\',this.checked)"><span class="toggle-slider"></span></label><span class="form-label" style="min-width:auto">过滤相关性 > ' + rk.portfolioCorrelation + ' 的策略</span></div>' +
+        '</div></div>';
+}
+
+function renderNotes() {
+    return '<div class="panel-title">Notes</div><div class="panel-desc">添加策略备注和说明</div>' +
+        '<div class="card"><div class="card-header">📝 策略备注</div><div class="card-body">' +
+        '<textarea class="form-input" style="width:100%;height:200px;resize:vertical" placeholder="输入策略备注..." onchange="updateState(\'notes\',this.value)">' + builderState.notes + '</textarea>' +
+        '</div></div>';
+}
+
+// ============================================================
+// State Update Functions
+// ============================================================
+function updateState(key, value) { builderState[key] = value; updateSummary(); }
+function updateGenetic(key, value) { builderState.genetic[key] = value; updateSummary(); }
+function updateData(key, value) { builderState.data[key] = value; updateSummary(); }
+function updateSubchart(index, key, value) { builderState.data.subcharts[index][key] = value; updateSummary(); }
+function addSubchart() { builderState.data.subcharts.push({symbol:"USA500IDXUSD",timeframe:"H1"}); renderPanels(); }
+function removeSubchart(index) { builderState.data.subcharts.splice(index,1); renderPanels(); }
+function updateDataPart(index, key, value) { builderState.data.dataParts[index][key] = value; updateSummary(); }
+function addDataPart() { builderState.data.dataParts.push({label:"NEW",type:"in_sample",start:"2024-01-01",end:"2024-12-31",pct:50}); renderPanels(); }
+function removeDataPart(index) { builderState.data.dataParts.splice(index,1); renderPanels(); }
+function updateTrading(key, value) { builderState.trading[key] = value; updateSummary(); }
+function updateMoney(key, value) { builderState.money[key] = value; updateSummary(); }
+function updateRobustness(key, value) { builderState.robustness[key] = value; updateSummary(); }
+function updateRobustnessBasic(key, value) { builderState.robustness.basic[key].enabled = value; updateSummary(); }
+function updateRobustnessStandard(key, value) { builderState.robustness.standard[key].enabled = value; updateSummary(); }
+function updateRobustnessExtensive(key, value) { builderState.robustness.extensive[key].enabled = value; updateSummary(); }
+function updateRanking(key, value) { builderState.ranking[key] = value; updateSummary(); }
+function updateAutoFilter(index, key, value) { builderState.ranking.autoFilters[index][key] = value; updateSummary(); }
+
+function updateSummary() {
+    var s = builderState;
+    var summary = s.data.symbol + " / " + s.data.timeframe + " | " + s.tradingDirection + " | " + s.buildMode;
+    document.getElementById("configSummary").textContent = summary;
+}
+
+function resetBuilder() {
+    if (confirm("确定要重置所有配置吗？")) {
+        location.reload();
+    }
+}
+
+function loadTemplate() {
+    alert("模板加载功能将在后续版本中实现");
+}
+
+function previewStrategy() {
+    alert("条件预览功能:
+
+" + JSON.stringify(builderState, null, 2).substring(0, 500) + "...");
+}
+
+function runBacktest() {
+    alert("回测功能:
+
+正在将配置发送到后端...
+
+策略: " + builderState.data.symbol + "
+周期: " + builderState.data.timeframe + "
+方向: " + builderState.tradingDirection);
+}
+
+// Initialize
+renderTabs();
+renderPanels();
+updateSummary();
+</script>
+</body>
+</html>

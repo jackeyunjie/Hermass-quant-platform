@@ -272,6 +272,31 @@ async def structuring_page(request: Request) -> HTMLResponse:
 
     return templates.TemplateResponse(
         request,
+        "sqx_builder.html",
+        _ctx(
+            request,
+            trace_id="",
+            strategy_id="",
+            natural_language="",
+            dsl=None,
+            generation_errors=[],
+            validation=None,
+            red_line_result={"passed": True, "triggered_rules": []},
+            run_tag=default_backtest_run_tag(),
+            disclaimer=_disclaimer(),
+        ),
+    )
+
+
+@router.get("/structuring/classic")
+async def structuring_classic_page(request: Request) -> HTMLResponse:
+    """Render the classic strategy structuring form (legacy)."""
+    auth = _require_auth_or_redirect(request)
+    if isinstance(auth, RedirectResponse):
+        return auth
+
+    return templates.TemplateResponse(
+        request,
         "structuring.html",
         _ctx(
             request,

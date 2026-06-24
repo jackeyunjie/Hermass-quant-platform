@@ -5,6 +5,441 @@
 {% block content %}
 <h1>策略构建</h1>
 
+<div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('nl')">自然语言描述</button>
+    <button class="tab-btn" onclick="switchTab('guided')">引导式构建</button>
+</div>
+
+<!-- 自然语言模式 -->
+<div id="tab-nl" class="tab-content active">
+    <form method="post" action="/strategy-lab/structuring" class="form-card">
+        <div class="form-group">
+            <label for="strategy_id">策略 ID</label>
+            <input type="text" id="strategy_id" name="strategy_id" value="{{ strategy_id }}" required
+                   pattern="[a-z0-9_]+" placeholder="ma5_cross_ma20_stop_8">
+            <small>仅允许小写字母、数字和下划线</small>
+        </div>
+        <div class="form-group">
+            <label for="natural_language">中文策略描述</label>
+            <textarea id="natural_language" name="natural_language" rows="4" required
+                      placeholder="MA5上穿MA20买入，跌破MA10卖出，止损8%">{{ natural_language }}</textarea>
+            <small>支持以下表达方式：</small>
+            <ul class="hint-list">
+                <li><strong>均线交叉：</strong>MA5上穿MA20买入 / MA10下穿MA30卖出</li>
+                <li><strong>价格突破：</strong>价格上穿MA20 / 跌破MA10</li>
+                <li><strong>状态条件：</strong>D1状态属于0x01,0x02 / 状态EF数量>=3</li>
+                <li><strong>成交量：</strong>成交量放大到5日均量2倍以上</li>
+                <li><strong>止损止盈：</strong>止损8% / 止盈15%</li>
+                <li><strong>仓位：</strong>仓位20% / 单笔风险2%</li>
+                <li><strong>过滤：</strong>排除涨停 / 行业包含电子、医药生物</li>
+            </ul>
+        </div>
+        <button type="submit" class="btn primary">生成并校验</button>
+    </form>
+</div>
+
+<!-- 引导式构建模式 -->
+<div id="tab-guided" class="tab-content" style="display:none;">
+    <form method="post" action="/strategy-lab/structuring" class="form-card" id="guided-form">
+        <div class="form-group">
+            <label for="guided_strategy_id">策略 ID</label>
+            <input type="text" id="guided_strategy_id" name="strategy_id" required
+                   pattern="[a-z0-9_]+" placeholder="ma5_cross_ma20_stop_8">
+            <small>仅允许小写字母、数字和下划线</small>
+        </div>
+
+        <div class="section">
+            <h3>入场条件（Entry）</h3>
+            <div id="entry-conditions">
+                <div class="condition-row" data-type="entry">
+                    <select name="entry_type[]" class="condition-select">
+                        <option value="">选择条件类型</option>
+                        <option value="ma_golden_cross">均线金叉（MA上穿MA）</option>
+                        <option value="price_cross_ma">价格突破均线</option>
+                        <option value="state_hex_in">状态值匹配</option>
+                        <option value="state_ef_count">EF数量条件</option>
+                        <option value="volume_ratio">成交量放大</option>
+                    </select>
+                    <div class="params"></div>
+                    <button type="button" class="btn small" onclick="removeCondition(this)">删除</button>
+                </div>
+            </div>
+            <button type="button" class="btn secondary" onclick="addCondition('entry')">+ 添加入场条件</button>
+        </div>
+
+        <div class="section">
+            <h3>出场条件（Exit）</h3>
+            <div id="exit-conditions">
+                <div class="condition-row" data-type="exit">
+                    <select name="exit_type[]" class="condition-select">
+                        <option value="">选择条件类型</option>
+                        <option value="ma_death_cross">均线死叉（MA下穿MA）</option>
+                        <option value="price_cross_ma">价格跌破均线</option>
+                        <option value="stop_loss_pct">止损百分比</option>
+                        <option value="take_profit_pct">止盈百分比</option>
+                    </select>
+                    <div class="params"></div>
+                    <button type="button" class="btn small" onclick="removeCondition(this)">删除</button>
+                </div>
+            </div>
+            <button type="button" class="btn secondary" onclick="addCondition('exit')">+ 添加出场条件</button>
+        </div>
+
+        <div class="section">
+            <h3>过滤条件（Filter）</h3>
+            <div id="filter-conditions">
+                <div class="condition-row" data-type="filter">
+                    <select name="filter_type[]" class="condition-select">
+                        <option value="">选择条件类型</option>
+                        <option value="industry_include">行业包含</option>
+                        <option value="industry_exclude">行业排除</option>
+                        <option value="limit_up_filter">涨停过滤</option>
+                    </select>
+                    <div class="params"></div>
+                    <button type="button" class="btn small" onclick="removeCondition(this)">删除</button>
+                </div>
+            </div>
+            <button type="button" class="btn secondary" onclick="addCondition('filter')">+ 添加过滤条件</button>
+        </div>
+
+        <div class="section">
+            <h3>风控配置</h3>
+            <div class="form-group">
+                <label for="max_position">最大仓位 (%)</label>
+                <input type="number" id="max_position" name="max_position" value="20" min="1" max="100">
+            </div>
+            <div class="form-group">
+                <label for="risk_per_trade">单笔风险 (%)</label>
+                <input type="number" id="risk_per_trade" name="risk_per_trade" value="2" min="0.1" max="10" step="0.1">
+            </div>
+        </div>
+
+        <input type="hidden" name="natural_language" id="guided_nl_output">
+        <button type="submit" class="btn primary" onclick="return buildNaturalLanguage()">生成并校验</button>
+    </form>
+</div>
+
+{% if generation_errors %}
+<div class="error-box">
+    <h3>生成失败</h3>
+    {% for error in generation_errors %}
+    <p>{{ error }}</p>
+    {% endfor %}
+    <div class="help">
+        <h4>建议：</h4>
+        <ul>
+            <li>尝试使用更标准的表达方式，如"MA5上穿MA20"而不是"均线顺序排列"</li>
+            <li>使用"引导式构建"模式，通过选择条件类型来构建策略</li>
+            <li>确保包含入场条件（如MA交叉、价格突破等）</li>
+            <li>确保包含止损条件（如"止损8%"）</li>
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% if validation %}
+<section class="result-card">
+    <h2>校验结果</h2>
+    <p><strong>状态：</strong>
+        {% if validation.passed %}
+        <span class="tag success">通过</span>
+        {% else %}
+        <span class="tag failed">失败</span>
+        {% endif %}
+    </p>
+    <p><strong>最高错误级别：</strong> {{ validation.level }}</p>
+
+    {% if validation.errors %}
+    <h3>错误</h3>
+    <ul class="detail-list">
+        {% for error in validation.errors %}
+        <li>
+            <code>{{ error.code }}</code> {{ error.message }}
+            {% if error.path %}<small>(路径: {{ error.path }})</small>{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if validation.warnings %}
+    <h3>警告</h3>
+    <ul class="detail-list">
+        {% for warning in validation.warnings %}
+        <li><code>{{ warning.code }}</code> {{ warning.message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <h3>红线检查</h3>
+    <p>
+        {% if red_line_result.passed %}
+        <span class="tag success">通过</span>
+        {% else %}
+        <span class="tag failed">拒绝</span>
+        {% endif %}
+    </p>
+    {% if red_line_result.triggered_rules %}
+    <ul class="detail-list">
+        {% for rule in red_line_result.triggered_rules %}
+        <li>
+            <code>{{ rule }}</code>
+            {% if rule == "RL_EXIT_MUST_HAVE_STOP_LOSS" %}
+            — 策略缺少止损条件
+            {% elif rule == "RL_MAX_POSITION" %}
+            — 仓位超过 25%
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if validation.passed and red_line_result.passed %}
+    <div class="actions">
+        <a class="btn" href="/strategy-lab/diagnosis?trace_id={{ trace_id }}">进入策略诊断 →</a>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if dsl %}
+<section class="result-card">
+    <h2>生成的 DSL</h2>
+    <details>
+        <summary>展开 / 收起</summary>
+        <pre class="code-block">{{ dsl | tojson(indent=2) }}</pre>
+    </details>
+</section>
+{% endif %}
+
+<script>
+// 条件参数模板
+const conditionParams = {
+    ma_golden_cross: `
+        <input type="number" name="entry_fast[]" placeholder="快线周期" value="5" min="1" max="252">
+        <input type="number" name="entry_slow[]" placeholder="慢线周期" value="20" min="1" max="252">
+    `,
+    ma_death_cross: `
+        <input type="number" name="exit_fast[]" placeholder="快线周期" value="5" min="1" max="252">
+        <input type="number" name="exit_slow[]" placeholder="慢线周期" value="20" min="1" max="252">
+    `,
+    price_cross_ma: `
+        <select name="entry_direction[]">
+            <option value="above">上穿（突破）</option>
+            <option value="below">跌破</option>
+        </select>
+        <input type="number" name="entry_ma_period[]" placeholder="均线周期" value="20" min="1" max="252">
+    `,
+    state_hex_in: `
+        <select name="entry_timeframe[]">
+            <option value="D1">D1（日线）</option>
+            <option value="W1">W1（周线）</option>
+            <option value="MN1">MN1（月线）</option>
+        </select>
+        <input type="text" name="entry_values[]" placeholder="状态值，如: 0x01,0x02" value="0x01">
+    `,
+    state_ef_count: `
+        <select name="entry_operator[]">
+            <option value=">=">>=（大于等于）</option>
+            <option value=">">>（大于）</option>
+            <option value="<="><=（小于等于）</option>
+            <option value="<"><（小于）</option>
+        </select>
+        <input type="number" name="entry_value[]" placeholder="阈值" value="3" min="0" max="10">
+    `,
+    volume_ratio: `
+        <input type="number" name="entry_lookback[]" placeholder="回看周期" value="5" min="1" max="60">
+        <select name="entry_operator[]">
+            <option value=">">>（大于）</option>
+            <option value=">=">>=（大于等于）</option>
+        </select>
+        <input type="number" name="entry_value[]" placeholder="倍数" value="2" min="0" step="0.1">
+    `,
+    stop_loss_pct: `
+        <input type="number" name="exit_stop_loss[]" placeholder="止损百分比" value="8" min="0.1" max="50" step="0.1">
+    `,
+    take_profit_pct: `
+        <input type="number" name="exit_take_profit[]" placeholder="止盈百分比" value="15" min="0.1" max="100" step="0.1">
+    `,
+    industry_include: `
+        <input type="text" name="filter_values[]" placeholder="行业，如: 电子,医药生物" value="电子,医药生物">
+    `,
+    industry_exclude: `
+        <input type="text" name="filter_values[]" placeholder="行业，如: 银行,房地产" value="银行,房地产">
+    `,
+    limit_up_filter: `
+        <select name="filter_allow[]">
+            <option value="false">排除涨停</option>
+            <option value="true">允许涨停</option>
+        </select>
+    `
+};
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.querySelector('.tab-btn[onclick="switchTab(\'' + tab + '\')"]').classList.add('active');
+}
+
+function addCondition(type) {
+    const container = document.getElementById(type + '-conditions');
+    const row = container.querySelector('.condition-row').cloneNode(true);
+    row.querySelector('.params').innerHTML = '';
+    container.appendChild(row);
+}
+
+function removeCondition(btn) {
+    const row = btn.closest('.condition-row');
+    const container = row.parentElement;
+    if (container.querySelectorAll('.condition-row').length > 1) {
+        row.remove();
+    } else {
+        // Reset to empty
+        row.querySelector('.condition-select').value = '';
+        row.querySelector('.params').innerHTML = '';
+    }
+}
+
+// 当选择条件类型时，显示对应的参数输入
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('condition-select')) {
+        const type = e.target.value;
+        const paramsDiv = e.target.closest('.condition-row').querySelector('.params');
+        if (type && conditionParams[type]) {
+            paramsDiv.innerHTML = conditionParams[type];
+        } else {
+            paramsDiv.innerHTML = '';
+        }
+    }
+});
+
+function buildNaturalLanguage() {
+    const entries = [];
+    const exits = [];
+    const filters = [];
+
+    // 收集入场条件
+    document.querySelectorAll('#entry-conditions .condition-row').forEach(row => {
+        const type = row.querySelector('select').value;
+        if (!type) return;
+
+        const params = row.querySelectorAll('.params input, .params select');
+        const vals = Array.from(params).map(p => p.value);
+
+        switch(type) {
+            case 'ma_golden_cross':
+                entries.push(`MA${vals[0]}上穿MA${vals[1]}`);
+                break;
+            case 'price_cross_ma':
+                const dir = vals[0] === 'above' ? '上穿' : '跌破';
+                entries.push(`价格${dir}MA${vals[1]}`);
+                break;
+            case 'state_hex_in':
+                entries.push(`${vals[0]}状态属于${vals[1]}`);
+                break;
+            case 'state_ef_count':
+                entries.push(`状态EF数量${vals[0]}${vals[1]}`);
+                break;
+            case 'volume_ratio':
+                entries.push(`成交量放大到${vals[0]}日均量${vals[1]}倍以上`);
+                break;
+        }
+    });
+
+    // 收集出场条件
+    document.querySelectorAll('#exit-conditions .condition-row').forEach(row => {
+        const type = row.querySelector('select').value;
+        if (!type) return;
+
+        const params = row.querySelectorAll('.params input, .params select');
+        const vals = Array.from(params).map(p => p.value);
+
+        switch(type) {
+            case 'ma_death_cross':
+                exits.push(`MA${vals[0]}下穿MA${vals[1]}`);
+                break;
+            case 'price_cross_ma':
+                const dir = vals[0] === 'above' ? '上穿' : '跌破';
+                exits.push(`价格${dir}MA${vals[1]}`);
+                break;
+            case 'stop_loss_pct':
+                exits.push(`止损${vals[0]}%`);
+                break;
+            case 'take_profit_pct':
+                exits.push(`止盈${vals[0]}%`);
+                break;
+        }
+    });
+
+    // 收集过滤条件
+    document.querySelectorAll('#filter-conditions .condition-row').forEach(row => {
+        const type = row.querySelector('select').value;
+        if (!type) return;
+
+        const params = row.querySelectorAll('.params input, .params select');
+        const vals = Array.from(params).map(p => p.value);
+
+        switch(type) {
+            case 'industry_include':
+                filters.push(`行业包含${vals[0]}`);
+                break;
+            case 'industry_exclude':
+                filters.push(`行业排除${vals[0]}`);
+                break;
+            case 'limit_up_filter':
+                filters.push(vals[0] === 'true' ? '允许涨停' : '排除涨停');
+                break;
+        }
+    });
+
+    // 构建自然语言描述
+    const parts = [];
+    if (entries.length) parts.push(entries.join('且'));
+    if (exits.length) parts.push(exits.join('且'));
+    if (filters.length) parts.push(filters.join('且'));
+
+    const maxPosition = document.getElementById('max_position').value;
+    const riskPerTrade = document.getElementById('risk_per_trade').value;
+    parts.push(`仓位${maxPosition}%`);
+    parts.push(`单笔风险${riskPerTrade}%`);
+
+    const nl = parts.join('，');
+    document.getElementById('guided_nl_output').value = nl;
+
+    // 同时更新 strategy_id
+    const strategyId = document.getElementById('guided_strategy_id').value;
+    document.querySelector('input[name="strategy_id"]').value = strategyId;
+
+    return true;
+}
+</script>
+
+<style>
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
+.tab-btn { padding: 10px 20px; border: none; background: #f3f4f6; cursor: pointer; border-radius: 4px 4px 0 0; }
+.tab-btn.active { background: #fff; border-bottom: 2px solid #3b82f6; margin-bottom: -2px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.section { margin: 20px 0; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; }
+.section h3 { margin-top: 0; }
+.condition-row { display: flex; gap: 8px; align-items: center; margin: 8px 0; padding: 8px; background: #f9fafb; border-radius: 4px; }
+.condition-row select { padding: 6px; }
+.condition-row .params { display: flex; gap: 8px; flex: 1; }
+.condition-row .params input, .condition-row .params select { padding: 6px; }
+.btn.small { padding: 4px 8px; font-size: 12px; }
+.hint-list { font-size: 13px; color: #6b7280; margin: 8px 0; padding-left: 20px; }
+.hint-list li { margin: 4px 0; }
+.help { margin-top: 12px; padding: 12px; background: #fef3c7; border-radius: 4px; }
+.help h4 { margin-top: 0; }
+</style>
+{% endblock %}
+{% extends "base.html" %}
+
+{% block title %}策略构建 - Hermass Strategy Lab{% endblock %}
+
+{% block content %}
+<h1>策略构建</h1>
+
 <form method="post" action="/strategy-lab/structuring" class="form-card">
     <div class="form-group">
         <label for="strategy_id">策略 ID</label>

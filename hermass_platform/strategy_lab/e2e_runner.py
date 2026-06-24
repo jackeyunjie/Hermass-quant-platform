@@ -121,6 +121,43 @@ class NLToDSLParser:
                 )
             )
 
+        # 均线多头排列: MA{N},MA{M},MA{P}均线顺序排列多头
+        # 例如: "144,169,200均线顺序排列多头"
+        ma_arrange_match = re.search(r"MA?(\d+)[,，]MA?(\d+)[,，]MA?(\d+).*?(?:均线)?顺序排列多头", nl)
+        if ma_arrange_match:
+            # 将多头排列转换为多个价格突破条件
+            # 简化为: 价格上穿最短周期均线
+            short_period = int(ma_arrange_match.group(1))
+            entry.append(
+                ConditionBlock(
+                    condition_type="price_cross_ma",
+                    params={"timeframe": "D1", "ma_period": short_period, "direction": "above"},
+                )
+            )
+
+        # 价格回调/回测后上涨: 价格回测到MA{N}均线再次上涨
+        # 例如: "价格回测到169均线再次上涨"
+        pullback_match = re.search(r"价格回[测撤]到MA?(\d+).*?再次上涨", nl)
+        if pullback_match:
+            ma_period = int(pullback_match.group(1))
+            entry.append(
+                ConditionBlock(
+                    condition_type="price_cross_ma",
+                    params={"timeframe": "D1", "ma_period": ma_period, "direction": "above"},
+                )
+            )
+
+        # 均线支撑: 价格回踩MA{N}均线支撑
+        support_match = re.search(r"价格回踩MA?(\d+).*?支撑", nl)
+        if support_match:
+            ma_period = int(support_match.group(1))
+            entry.append(
+                ConditionBlock(
+                    condition_type="price_cross_ma",
+                    params={"timeframe": "D1", "ma_period": ma_period, "direction": "above"},
+                )
+            )
+
         # State hex in: D1状态属于...
         state_match = re.search(r"(MN1|W1|D1)状态属于([0-9a-zA-Z_、或]+)", nl)
         if state_match:
@@ -196,10 +233,22 @@ class NLToDSLParser:
                 )
             )
 
-        # Price cross MA (below): 跌破MA{N}
+        # Price cross MA (below): 跌破MA{N} / 均线{N}出场 / MA{N}出场
         price_below_match = re.search(r"跌破MA(\d+)", nl)
         if price_below_match:
             ma_period = int(price_below_match.group(1))
+            exit.append(
+                ConditionBlock(
+                    condition_type="price_cross_ma",
+                    params={"timeframe": "D1", "ma_period": ma_period, "direction": "below"},
+                    logic="or",
+                )
+            )
+
+        # 均线出场: MA{N}出场 / 均线{N}出场
+        ma_exit_match = re.search(r"(?:MA|均线)(\d+).*?出场", nl)
+        if ma_exit_match:
+            ma_period = int(ma_exit_match.group(1))
             exit.append(
                 ConditionBlock(
                     condition_type="price_cross_ma",
@@ -256,6 +305,32 @@ class NLToDSLParser:
                     params={"allow": False},
                 )
             )
+
+        # Industry include: 行业包含{行业1},{行业2}
+        industry_include_match = re.search(r"行业包含([\u4e00-\u9fa5a-zA-Z,、]+)", nl)
+        if industry_include_match:
+            values_str = industry_include_match.group(1)
+            values = [v.strip() for v in re.split(r"[,，、]", values_str) if v.strip()]
+            if values:
+                filters.append(
+                    ConditionBlock(
+                        condition_type="industry_include",
+                        params={"values": values},
+                    )
+                )
+
+        # Industry exclude: 行业排除{行业1},{行业2}
+        industry_exclude_match = re.search(r"行业排除([\u4e00-\u9fa5a-zA-Z,、]+)", nl)
+        if industry_exclude_match:
+            values_str = industry_exclude_match.group(1)
+            values = [v.strip() for v in re.split(r"[,，、]", values_str) if v.strip()]
+            if values:
+                filters.append(
+                    ConditionBlock(
+                        condition_type="industry_exclude",
+                        params={"values": values},
+                    )
+                )
 
         # Risk config defaults
         max_position = 0.20

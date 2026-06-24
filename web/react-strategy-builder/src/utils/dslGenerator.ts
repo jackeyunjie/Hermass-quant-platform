@@ -1,11 +1,17 @@
 import type { Node, Edge } from '@xyflow/react';
-import type { StrategyNodeData, StrategyDSL, ConditionBlock, RiskConfig } from '../types/strategy';
+import type { StrategyNodeData, StrategyDSL, ConditionBlock, RiskConfig, MultiTimeframeConfig, MultiPeriodConfig, BacktestPeriod } from '../types/strategy';
+
+export interface DSLGeneratorOptions {
+  multiTimeframe?: MultiTimeframeConfig;
+  multiPeriod?: MultiPeriodConfig;
+}
 
 export function generateDSL(
   nodes: Node<StrategyNodeData>[],
   _edges: Edge[],
   strategyId: string,
-  strategyName: string
+  strategyName: string,
+  options: DSLGeneratorOptions = {}
 ): StrategyDSL {
   const entry: ConditionBlock[] = [];
   const exit: ConditionBlock[] = [];
@@ -51,7 +57,7 @@ export function generateDSL(
     }
   }
 
-  return {
+  const dsl: StrategyDSL = {
     strategy_id: strategyId,
     name: strategyName,
     version: 'strategy_dsl_v2',
@@ -60,6 +66,18 @@ export function generateDSL(
     filters,
     risk,
   };
+
+  // Add multi-timeframe config if provided
+  if (options.multiTimeframe) {
+    dsl.multi_timeframe = options.multiTimeframe;
+  }
+
+  // Add multi-period config if provided
+  if (options.multiPeriod) {
+    dsl.multi_period = options.multiPeriod;
+  }
+
+  return dsl;
 }
 
 export function validateNodeConnections(nodes: Node<StrategyNodeData>[], edges: Edge[]): string[] {
@@ -121,7 +139,68 @@ function getRequiredParams(conditionType: string): string[] {
     industry_include: ['values'],
     industry_exclude: ['values'],
     limit_up_filter: ['allow'],
+    // SQX Expansion
+    rsi_threshold: ['period', 'operator', 'value'],
+    macd_cross: ['fast', 'slow', 'signal', 'direction'],
+    bollinger_breakout: ['period', 'std_dev', 'direction'],
+    ma_bullish_alignment: ['ma_periods'],
+    price_above_ma: ['ma_period'],
+    atr_trailing_stop: ['atr_period', 'multiplier'],
+    exit_after_bars: ['max_bars'],
+    indicator_reversal_exit: ['indicator', 'period', 'direction'],
+    liquidity_filter: ['min_turnover'],
+    volatility_filter: ['atr_period', 'operator', 'threshold_pct'],
+    time_filter: [],
+    st_new_stock_filter: ['exclude_st'],
+    max_position_pct: ['value'],
+    max_drawdown_stop: ['value'],
   };
   
   return paramMap[conditionType] || [];
 }
+
+// Multi-timeframe helpers
+export function createMultiTimeframeConfig(
+  timeframes: string[] = ['D1'],
+  primary: string = 'D1',
+  requireAll: boolean = false
+): MultiTimeframeConfig {
+  return {
+    timeframes,
+    primary_timeframe: primary,
+    require_all_timeframes: requireAll,
+  };
+}
+
+// Multi-period helpers
+export function createMultiPeriodConfig(
+  periods: BacktestPeriod[] = [],
+  aggregateMethod: 'concat' | 'average' | 'weighted' = 'concat',
+  minPeriods: number = 1
+): MultiPeriodConfig {
+  return {
+    periods,
+    aggregate_method: aggregateMethod,
+    min_periods_required: minPeriods,
+  };
+}
+
+// Preset period configurations for common market regimes
+export const PRESET_PERIODS = {
+  bull_bear_split: [
+    { start_date: '2020-01-01', end_date: '2021-12-31', label: '2020-2021 牛市' },
+    { start_date: '2022-01-01', end_date: '2024-12-31', label: '2022-2024 震荡' },
+  ],
+  five_year_split: [
+    { start_date: '2020-01-01', end_date: '2020-12-31', label: '2020' },
+    { start_date: '2021-01-01', end_date: '2021-12-31', label: '2021' },
+    { start_date: '2022-01-01', end_date: '2022-12-31', label: '2022' },
+    { start_date: '2023-01-01', end_date: '2023-12-31', label: '2023' },
+    { start_date: '2024-01-01', end_date: '2024-12-31', label: '2024' },
+  ],
+  crisis_test: [
+    { start_date: '2020-01-01', end_date: '2020-06-30', label: '2020疫情暴跌' },
+    { start_date: '2020-07-01', end_date: '2021-12-31', label: '2020-2021反弹' },
+    { start_date: '2022-01-01', end_date: '2022-12-31', label: '2022熊市' },
+  ],
+};

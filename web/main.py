@@ -53,14 +53,14 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Static assets
-static_dir = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
-# Strategy builder React app
+# Strategy builder React app (must be mounted BEFORE /static)
 builder_dir = Path(__file__).parent / "react-strategy-builder" / "dist"
 if builder_dir.exists():
     app.mount("/static/strategy-builder", StaticFiles(directory=str(builder_dir)), name="strategy-builder")
+
+# Static assets (mounted AFTER to avoid shadowing strategy-builder)
+static_dir = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Templates
 templates_dir = Path(__file__).parent / "templates"

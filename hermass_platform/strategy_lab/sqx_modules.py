@@ -1,0 +1,1048 @@
+"""SQX Full Module Expansion - Complete condition registry extension.
+
+This module registers all SQX-inspired conditions in a single import.
+Usage:
+    from hermass_platform.strategy_lab.sqx_modules import register_sqx_modules
+    register_sqx_modules(registry)
+"""
+
+from __future__ import annotations
+
+from hermass_platform.strategy_lab.condition_registry import (
+    ConditionCategory,
+    ConditionRegistry,
+    ConditionSpec,
+    ContextRequirement,
+    ParamSchema,
+    PreviewSupport,
+    TranslatorDialect,
+)
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 1: Generic Signal Comparisons (factor-agnostic)
+# ---------------------------------------------------------------------------
+
+_SIGNAL_COMPARISON_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="factor_threshold",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="factor_id", param_type="string", required=True,
+                       description="Factor identifier (e.g. rsi_14, close, volume)"),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<=", "==", "!="]}),
+            ParamSchema(name="threshold", param_type="number", required=True,
+                       description="Threshold value to compare against"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Generic factor threshold comparison (any numeric factor vs value)",
+        examples=[{"factor_id": "rsi_14", "operator": "<", "threshold": 30}],
+        required_columns=["{factor_id}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="factor_cross",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="factor_a", param_type="string", required=True,
+                       description="First factor identifier"),
+            ParamSchema(name="factor_b", param_type="string", required=True,
+                       description="Second factor identifier"),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Cross direction",
+                       constraints={"enum": ["above", "below"]}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Generic factor cross (factor_a crosses above/below factor_b)",
+        examples=[{"factor_a": "ma_5", "factor_b": "ma_20", "direction": "above"}],
+        required_columns=["{factor_a}", "{factor_b}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="factor_slope",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="factor_id", param_type="string", required=True,
+                       description="Factor identifier"),
+            ParamSchema(name="lookback", param_type="integer", required=True,
+                       description="Lookback period for slope calculation",
+                       constraints={"minimum": 1, "maximum": 60}, default=5),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Slope direction",
+                       constraints={"enum": ["rising", "falling"]}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Factor slope direction (rising/falling over N bars)",
+        examples=[{"factor_id": "ma_20", "lookback": 5, "direction": "rising"}],
+        required_columns=["{factor_id}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="factor_percentile",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="factor_id", param_type="string", required=True,
+                       description="Factor identifier"),
+            ParamSchema(name="lookback", param_type="integer", required=True,
+                       description="Lookback period for percentile calculation",
+                       constraints={"minimum": 5, "maximum": 252}, default=20),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}),
+            ParamSchema(name="percentile", param_type="number", required=True,
+                       description="Percentile threshold (0-1)",
+                       constraints={"minimum": 0.0, "maximum": 1.0}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Factor percentile rank comparison (e.g. RSI in top 20%)",
+        examples=[{"factor_id": "rsi_14", "lookback": 20, "operator": ">", "percentile": 0.8}],
+        required_columns=["{factor_id}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 2: Technical Indicators (Oscillators)
+# ---------------------------------------------------------------------------
+
+_OSCILLATOR_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="rsi_threshold",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="period", param_type="integer", required=True,
+                       description="RSI calculation period",
+                       constraints={"minimum": 2, "maximum": 60}, default=14),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}, default="<"),
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="RSI threshold value (0-100)",
+                       constraints={"minimum": 0.0, "maximum": 100.0}, default=30),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="RSI crosses above/below threshold (e.g. RSI<30 oversold, RSI>70 overbought)",
+        examples=[{"period": 14, "operator": "<", "value": 30}],
+        required_columns=["rsi_{period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="macd_cross",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="fast", param_type="integer", required=True,
+                       description="Fast EMA period", default=12,
+                       constraints={"minimum": 2, "maximum": 60}),
+            ParamSchema(name="slow", param_type="integer", required=True,
+                       description="Slow EMA period", default=26,
+                       constraints={"minimum": 5, "maximum": 120}),
+            ParamSchema(name="signal", param_type="integer", required=True,
+                       description="Signal line period", default=9,
+                       constraints={"minimum": 2, "maximum": 60}),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Cross direction",
+                       constraints={"enum": ["bullish", "bearish"]}, default="bullish"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="MACD line crosses above/below signal line",
+        examples=[{"fast": 12, "slow": 26, "signal": 9, "direction": "bullish"}],
+        required_columns=["macd_{fast}_{slow}", "macd_signal_{fast}_{slow}_{signal}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="cci_threshold",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="period", param_type="integer", required=True,
+                       description="CCI calculation period", default=20,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}, default="<"),
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="CCI threshold", default=-100),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="CCI crosses above/below threshold (e.g. CCI<-100 oversold, CCI>100 overbought)",
+        examples=[{"period": 20, "operator": "<", "value": -100}],
+        required_columns=["cci_{period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="stochastic_cross",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="k_period", param_type="integer", required=True,
+                       description="K line period", default=14,
+                       constraints={"minimum": 2, "maximum": 60}),
+            ParamSchema(name="d_period", param_type="integer", required=True,
+                       description="D line period", default=3,
+                       constraints={"minimum": 1, "maximum": 20}),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Cross direction",
+                       constraints={"enum": ["bullish", "bearish"]}, default="bullish"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Stochastic K line crosses above/below D line",
+        examples=[{"k_period": 14, "d_period": 3, "direction": "bullish"}],
+        required_columns=["stoch_k_{k_period}", "stoch_d_{k_period}_{d_period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="williams_r_threshold",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="period", param_type="integer", required=True,
+                       description="Williams %R period", default=14,
+                       constraints={"minimum": 2, "maximum": 60}),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}, default="<"),
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="Williams %R threshold (-100 to 0)", default=-80,
+                       constraints={"minimum": -100, "maximum": 0}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Williams %R crosses above/below threshold (e.g. <-80 oversold, >-20 overbought)",
+        examples=[{"period": 14, "operator": "<", "value": -80}],
+        required_columns=["williams_r_{period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="adx_trend_strength",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="period", param_type="integer", required=True,
+                       description="ADX calculation period", default=14,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}, default=">="),
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="ADX threshold (typically 20-25 for trend)", default=25,
+                       constraints={"minimum": 0, "maximum": 100}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="ADX trend strength comparison (ADX>25 indicates strong trend)",
+        examples=[{"period": 14, "operator": ">=", "value": 25}],
+        required_columns=["adx_{period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 3: Volatility/Risk Indicators
+# ---------------------------------------------------------------------------
+
+_VOLATILITY_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="bollinger_breakout",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="period", param_type="integer", required=True,
+                       description="Bollinger Bands period", default=20,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="std_dev", param_type="number", required=True,
+                       description="Standard deviation multiplier", default=2.0,
+                       constraints={"minimum": 0.5, "maximum": 5.0}),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Breakout direction",
+                       constraints={"enum": ["upper", "lower", "squeeze"]}, default="upper"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Price breaks above upper, below lower Bollinger Band, or BB squeeze",
+        examples=[{"period": 20, "std_dev": 2.0, "direction": "upper"}],
+        required_columns=["close", "bb_upper_{period}_{std_dev}", "bb_lower_{period}_{std_dev}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="atr_threshold",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="period", param_type="integer", required=True,
+                       description="ATR calculation period", default=14,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}, default=">"),
+            ParamSchema(name="threshold_pct", param_type="number", required=True,
+                       description="ATR/Close ratio threshold", default=0.02,
+                       constraints={"minimum": 0.001, "maximum": 0.5}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="ATR volatility level comparison (ATR/Close ratio)",
+        examples=[{"period": 14, "operator": ">", "threshold_pct": 0.02}],
+        required_columns=["close", "atr_{period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="keltner_breakout",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="ema_period", param_type="integer", required=True,
+                       description="EMA period for Keltner middle line", default=20,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="atr_period", param_type="integer", required=True,
+                       description="ATR period", default=10,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="multiplier", param_type="number", required=True,
+                       description="ATR multiplier", default=1.5,
+                       constraints={"minimum": 0.5, "maximum": 5.0}),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Breakout direction",
+                       constraints={"enum": ["upper", "lower"]}, default="upper"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Price breaks above/below Keltner Channel",
+        examples=[{"ema_period": 20, "atr_period": 10, "multiplier": 1.5, "direction": "upper"}],
+        required_columns=["close", "keltner_upper_{ema_period}_{atr_period}_{multiplier}",
+                         "keltner_lower_{ema_period}_{atr_period}_{multiplier}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="super_trend_direction",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="atr_period", param_type="integer", required=True,
+                       description="ATR period", default=10,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="multiplier", param_type="number", required=True,
+                       description="ATR multiplier", default=3.0,
+                       constraints={"minimum": 0.5, "maximum": 10.0}),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Trend direction",
+                       constraints={"enum": ["bullish", "bearish"]}, default="bullish"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="SuperTrend indicator direction (bullish/bearish)",
+        examples=[{"atr_period": 10, "multiplier": 3.0, "direction": "bullish"}],
+        required_columns=["close", "super_trend_{atr_period}_{multiplier}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 4: Trend Indicators
+# ---------------------------------------------------------------------------
+
+_TREND_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="ma_bullish_alignment",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="ma_periods", param_type="array", required=True,
+                       description="MA periods in ascending order (e.g. [5, 10, 20])",
+                       constraints={"minItems": 2}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Multiple MAs in bullish alignment (short > medium > long)",
+        examples=[{"ma_periods": [5, 10, 20]}],
+        required_columns=["ma_{ma_periods[0]}", "ma_{ma_periods[1]}", "ma_{ma_periods[2]}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="price_above_ma",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="ma_period", param_type="integer", required=True,
+                       description="Moving average period",
+                       constraints={"minimum": 1, "maximum": 252}, default=20),
+            ParamSchema(name="consecutive_bars", param_type="integer", required=False,
+                       description="Minimum consecutive bars above MA", default=1,
+                       constraints={"minimum": 1, "maximum": 20}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Price has been above MA for N consecutive bars",
+        examples=[{"ma_period": 20, "consecutive_bars": 3}],
+        required_columns=["close", "ma_{ma_period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="adx_direction",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="period", param_type="integer", required=True,
+                       description="ADX period", default=14,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="di_plus", param_type="integer", required=True,
+                       description="DI+ period", default=14,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="di_minus", param_type="integer", required=True,
+                       description="DI- period", default=14,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Trend direction",
+                       constraints={"enum": ["bullish", "bearish"]}, default="bullish"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="ADX with DI+ > DI- (bullish) or DI- > DI+ (bearish)",
+        examples=[{"period": 14, "di_plus": 14, "di_minus": 14, "direction": "bullish"}],
+        required_columns=["adx_{period}", "di_plus_{di_plus}", "di_minus_{di_minus}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="parabolic_sar_direction",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="af", param_type="number", required=True,
+                       description="Acceleration factor", default=0.02,
+                       constraints={"minimum": 0.001, "maximum": 0.1}),
+            ParamSchema(name="max_af", param_type="number", required=True,
+                       description="Maximum acceleration factor", default=0.2,
+                       constraints={"minimum": 0.01, "maximum": 0.5}),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Trend direction",
+                       constraints={"enum": ["bullish", "bearish"]}, default="bullish"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Parabolic SAR trend direction",
+        examples=[{"af": 0.02, "max_af": 0.2, "direction": "bullish"}],
+        required_columns=["close", "parabolic_sar_{af}_{max_af}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="ichimoku_cloud",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="tenkan", param_type="integer", required=True,
+                       description="Tenkan-sen period", default=9,
+                       constraints={"minimum": 2, "maximum": 60}),
+            ParamSchema(name="kijun", param_type="integer", required=True,
+                       description="Kijun-sen period", default=26,
+                       constraints={"minimum": 5, "maximum": 120}),
+            ParamSchema(name="signal", param_type="string", required=True,
+                       description="Ichimoku signal type",
+                       constraints={"enum": ["tk_cross", "price_above_cloud", "price_below_cloud",
+                                              "chikou_above_price", "cloud_green"]},
+                       default="tk_cross"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Ichimoku cloud signals (TK cross, price/cloud position, etc.)",
+        examples=[{"tenkan": 9, "kijun": 26, "signal": "tk_cross"}],
+        required_columns=["tenkan_{tenkan}", "kijun_{kijun}", "senkou_a", "senkou_b", "chikou"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 5: Price Action / Patterns
+# ---------------------------------------------------------------------------
+
+_PRICE_ACTION_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="highest_high_breakout",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="lookback", param_type="integer", required=True,
+                       description="Lookback period for highest high", default=20,
+                       constraints={"minimum": 5, "maximum": 252}),
+            ParamSchema(name="volume_confirm", param_type="boolean", required=False,
+                       description="Require volume confirmation", default=True),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Price breaks above N-day highest high with optional volume confirmation",
+        examples=[{"lookback": 20, "volume_confirm": True}],
+        required_columns=["close", "high", "highest_high_{lookback}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="lowest_low_breakdown",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="lookback", param_type="integer", required=True,
+                       description="Lookback period for lowest low", default=20,
+                       constraints={"minimum": 5, "maximum": 252}),
+            ParamSchema(name="volume_confirm", param_type="boolean", required=False,
+                       description="Require volume confirmation", default=True),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Price breaks below N-day lowest low with optional volume confirmation",
+        examples=[{"lookback": 20, "volume_confirm": True}],
+        required_columns=["close", "low", "lowest_low_{lookback}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="candle_pattern",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="pattern", param_type="string", required=True,
+                       description="Candlestick pattern name",
+                       constraints={"enum": ["doji", "hammer", "shooting_star",
+                                              "bullish_engulfing", "bearish_engulfing",
+                                              "morning_star", "evening_star",
+                                              "piercing_line", "dark_cloud_cover"]},
+                       default="bullish_engulfing"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Candlestick pattern detection",
+        examples=[{"pattern": "bullish_engulfing"}],
+        required_columns=["open", "high", "low", "close"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="heiken_ashi_trend",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Trend direction",
+                       constraints={"enum": ["bullish", "bearish"]}, default="bullish"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Heiken Ashi candle trend direction",
+        examples=[{"direction": "bullish"}],
+        required_columns=["ha_close", "ha_open"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 6: Volume Analysis
+# ---------------------------------------------------------------------------
+
+_VOLUME_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="volume_ratio",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="lookback", param_type="integer", required=True,
+                       description="Lookback period for average volume", default=20,
+                       constraints={"minimum": 1, "maximum": 60}),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}, default=">"),
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="Volume ratio threshold", default=1.5,
+                       constraints={"minimum": 0.0}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Volume ratio compared to lookback average",
+        examples=[{"lookback": 20, "operator": ">", "value": 1.5}],
+        required_columns=["volume", "volume_ma_{lookback}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="volume_dry_up",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="lookback", param_type="integer", required=True,
+                       description="Lookback period", default=20,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="dry_up_pct", param_type="number", required=True,
+                       description="Volume dry-up percentage threshold", default=0.5,
+                       constraints={"minimum": 0.1, "maximum": 0.9}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Volume dries up to less than X% of average (consolidation signal)",
+        examples=[{"lookback": 20, "dry_up_pct": 0.5}],
+        required_columns=["volume", "volume_ma_{lookback}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="vwap_deviation",
+        category=ConditionCategory.ENTRY,
+        params=[
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}, default=">"),
+            ParamSchema(name="std_dev", param_type="number", required=True,
+                       description="Standard deviation threshold", default=2.0,
+                       constraints={"minimum": 0.5, "maximum": 5.0}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Price deviation from VWAP in standard deviations",
+        examples=[{"operator": ">", "std_dev": 2.0}],
+        required_columns=["close", "vwap", "vwap_std"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 7: Exit Methods (Advanced)
+# ---------------------------------------------------------------------------
+
+_EXIT_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="stop_loss_pct",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="Stop loss percentage (0-1)",
+                       constraints={"minimum": 0.0, "maximum": 1.0}, default=0.08),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Exit when loss exceeds specified percentage",
+        examples=[{"value": 0.08}],
+        required_columns=["close"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="Stop loss requires position context (entry_price).",
+    ),
+    ConditionSpec(
+        condition_type="take_profit_pct",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="Take profit percentage (0-1)",
+                       constraints={"minimum": 0.0, "maximum": 1.0}, default=0.15),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Exit when profit exceeds specified percentage",
+        examples=[{"value": 0.15}],
+        required_columns=["close"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="Take profit requires position context (entry_price).",
+    ),
+    ConditionSpec(
+        condition_type="atr_trailing_stop",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(name="atr_period", param_type="integer", required=True,
+                       description="ATR calculation period", default=14,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="multiplier", param_type="number", required=True,
+                       description="ATR multiplier for stop distance", default=2.0,
+                       constraints={"minimum": 0.5, "maximum": 5.0}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Trailing stop based on ATR (Chandelier-style)",
+        examples=[{"atr_period": 14, "multiplier": 2.0}],
+        required_columns=["close", "high", "low", "atr_{atr_period}"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="ATR trailing stop requires position context (entry_price, highest_since_entry).",
+    ),
+    ConditionSpec(
+        condition_type="chandelier_exit",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(name="atr_period", param_type="integer", required=True,
+                       description="ATR period", default=22,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="multiplier", param_type="number", required=True,
+                       description="ATR multiplier", default=3.0,
+                       constraints={"minimum": 0.5, "maximum": 10.0}),
+            ParamSchema(name="use_high", param_type="boolean", required=True,
+                       description="Use highest high (True) or lowest low (False) for short", default=True),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Chandelier exit: stop = highest_high - ATR * multiplier",
+        examples=[{"atr_period": 22, "multiplier": 3.0, "use_high": True}],
+        required_columns=["close", "high", "low", "atr_{atr_period}"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="Chandelier exit requires position context.",
+    ),
+    ConditionSpec(
+        condition_type="exit_after_bars",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(name="max_bars", param_type="integer", required=True,
+                       description="Maximum bars to hold position",
+                       constraints={"minimum": 1, "maximum": 252}, default=20),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Exit after holding position for N bars (time stop)",
+        examples=[{"max_bars": 20}],
+        required_columns=["bars_since_entry"],
+        required_tables=["positions"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="Requires position context to count bars since entry.",
+    ),
+    ConditionSpec(
+        condition_type="break_even_stop",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(name="profit_trigger_pct", param_type="number", required=True,
+                       description="Profit percentage to trigger BE move", default=0.05,
+                       constraints={"minimum": 0.01, "maximum": 0.5}),
+            ParamSchema(name="buffer_pct", param_type="number", required=False,
+                       description="Buffer above BE", default=0.01,
+                       constraints={"minimum": 0.0, "maximum": 0.1}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Move stop to break-even + buffer after profit trigger",
+        examples=[{"profit_trigger_pct": 0.05, "buffer_pct": 0.01}],
+        required_columns=["close", "entry_price"],
+        required_tables=["daily_bars", "positions"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="Requires position context.",
+    ),
+    ConditionSpec(
+        condition_type="indicator_reversal_exit",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(name="indicator", param_type="string", required=True,
+                       description="Indicator name",
+                       constraints={"enum": ["rsi", "macd", "cci", "stochastic"]}, default="rsi"),
+            ParamSchema(name="period", param_type="integer", required=True,
+                       description="Indicator period", default=14,
+                       constraints={"minimum": 2, "maximum": 60}),
+            ParamSchema(name="direction", param_type="string", required=True,
+                       description="Reversal direction",
+                       constraints={"enum": ["overbought", "oversold"]}, default="overbought"),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Exit when indicator reverses from extreme (e.g. RSI exits overbought)",
+        examples=[{"indicator": "rsi", "period": 14, "direction": "overbought"}],
+        required_columns=["{indicator}_{period}"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.POSITION],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+    ),
+    ConditionSpec(
+        condition_type="max_drawdown_stop",
+        category=ConditionCategory.EXIT,
+        params=[
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="Maximum portfolio drawdown percentage (0-1)", default=0.10,
+                       constraints={"minimum": 0.01, "maximum": 0.5}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Emergency stop when portfolio drawdown exceeds threshold",
+        examples=[{"value": 0.10}],
+        required_columns=["portfolio_equity", "portfolio_peak"],
+        required_tables=["portfolio"],
+        context_requirements=[ContextRequirement.PORTFOLIO],
+        preview_support=PreviewSupport.REQUIRES_BACKTEST_CONTEXT,
+        preview_notes="Portfolio-level stop requires backtest context.",
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 8: Filter Conditions (Market/Liquidity/Time)
+# ---------------------------------------------------------------------------
+
+_FILTER_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="industry_include",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="values", param_type="array", required=True,
+                       description="Industries to include", constraints={"minItems": 1}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Stock industry is in the include list",
+        examples=[{"values": ["电子", "医药生物"]}],
+        required_columns=["industry"],
+        required_tables=["stock_info"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="industry_exclude",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="values", param_type="array", required=True,
+                       description="Industries to exclude", constraints={"minItems": 1}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Stock industry is NOT in the exclude list",
+        examples=[{"values": ["银行", "房地产"]}],
+        required_columns=["industry"],
+        required_tables=["stock_info"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="limit_up_filter",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="allow", param_type="boolean", required=True,
+                       description="Whether to allow limit-up stocks", default=False),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Filter limit-up (涨停) stocks",
+        examples=[{"allow": False}],
+        required_columns=["is_limit_up"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.MARKET_STATE],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="liquidity_filter",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="min_turnover", param_type="number", required=True,
+                       description="Minimum daily turnover (10k CNY)", default=1000,
+                       constraints={"minimum": 100, "maximum": 100000}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Filter stocks with daily turnover below threshold",
+        examples=[{"min_turnover": 1000}],
+        required_columns=["amount"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="volatility_filter",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="atr_period", param_type="integer", required=True,
+                       description="ATR period for volatility measurement", default=14,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="operator", param_type="string", required=True,
+                       description="Comparison operator",
+                       constraints={"enum": [">", "<", ">=", "<="]}, default=">"),
+            ParamSchema(name="threshold_pct", param_type="number", required=True,
+                       description="ATR as percentage of close price threshold", default=0.02,
+                       constraints={"minimum": 0.001, "maximum": 0.5}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Filter by volatility level (ATR/close ratio)",
+        examples=[{"atr_period": 14, "operator": ">", "threshold_pct": 0.02}],
+        required_columns=["close", "atr_{atr_period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="time_filter",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="month_range", param_type="array", required=False,
+                       description="Allowed months (1-12), empty means all"),
+            ParamSchema(name="day_of_week", param_type="array", required=False,
+                       description="Allowed days (1=Mon-5=Fri), empty means all"),
+            ParamSchema(name="exclude_holidays", param_type="boolean", required=False,
+                       description="Exclude known Chinese market holidays", default=True),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Filter by trading time windows (month, day-of-week)",
+        examples=[{"month_range": [3, 4, 5], "exclude_holidays": True}],
+        required_columns=["date", "month", "day_of_week"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="st_new_stock_filter",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="exclude_st", param_type="boolean", required=True,
+                       description="Exclude ST/*ST stocks", default=True),
+            ParamSchema(name="max_listing_days", param_type="integer", required=False,
+                       description="Exclude stocks listed within N days", default=60,
+                       constraints={"minimum": 0, "maximum": 365}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Filter out ST stocks and newly listed stocks",
+        examples=[{"exclude_st": True, "max_listing_days": 60}],
+        required_columns=["is_st", "days_since_listing"],
+        required_tables=["stock_info"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+    ConditionSpec(
+        condition_type="market_regime_filter",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="regime", param_type="string", required=True,
+                       description="Market regime to filter for",
+                       constraints={"enum": ["bull", "bear", "sideways", "high_vol", "low_vol"]},
+                       default="bull"),
+            ParamSchema(name="ma_period", param_type="integer", required=False,
+                       description="MA period for regime detection", default=50,
+                       constraints={"minimum": 10, "maximum": 252}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Filter by market regime (bull/bear/sideways/volatility)",
+        examples=[{"regime": "bull", "ma_period": 50}],
+        required_columns=["close", "ma_{ma_period}"],
+        required_tables=["daily_bars"],
+        preview_support=PreviewSupport.FULLY_SUPPORTED,
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 9: Money Management / Sizing
+# ---------------------------------------------------------------------------
+
+_MONEY_MANAGEMENT_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="max_position_pct",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="value", param_type="number", required=True,
+                       description="Maximum position size as percentage of portfolio (0-1)", default=0.20,
+                       constraints={"minimum": 0.01, "maximum": 1.0}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Maximum single position percentage (red-line enforced)",
+        examples=[{"value": 0.20}],
+        required_columns=[],
+        required_tables=[],
+        context_requirements=[ContextRequirement.PORTFOLIO],
+        preview_support=PreviewSupport.UNSUPPORTED,
+        preview_notes="Position sizing requires portfolio context. Enforced by red-line validator.",
+    ),
+    ConditionSpec(
+        condition_type="fixed_amount_sizing",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="amount", param_type="number", required=True,
+                       description="Fixed amount per trade (RMB)", default=100000,
+                       constraints={"minimum": 1000, "maximum": 10000000}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Use fixed RMB amount per trade",
+        examples=[{"amount": 100000}],
+        required_columns=[],
+        required_tables=[],
+        context_requirements=[ContextRequirement.PORTFOLIO],
+        preview_support=PreviewSupport.UNSUPPORTED,
+        preview_notes="Sizing requires portfolio context.",
+    ),
+    ConditionSpec(
+        condition_type="atr_risk_sizing",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="risk_pct", param_type="number", required=True,
+                       description="Risk percentage per trade (0-1)", default=0.02,
+                       constraints={"minimum": 0.001, "maximum": 0.1}),
+            ParamSchema(name="atr_period", param_type="integer", required=True,
+                       description="ATR period for position sizing", default=14,
+                       constraints={"minimum": 5, "maximum": 60}),
+            ParamSchema(name="atr_multiplier", param_type="number", required=True,
+                       description="ATR multiplier for stop distance", default=2.0,
+                       constraints={"minimum": 0.5, "maximum": 5.0}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="ATR-based risk sizing (position = risk_amount / (ATR * multiplier))",
+        examples=[{"risk_pct": 0.02, "atr_period": 14, "atr_multiplier": 2.0}],
+        required_columns=["atr_{atr_period}"],
+        required_tables=["daily_bars"],
+        context_requirements=[ContextRequirement.PORTFOLIO],
+        preview_support=PreviewSupport.UNSUPPORTED,
+        preview_notes="ATR sizing requires portfolio context.",
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# SQX Block Family 10: Robustness / Monte Carlo
+# ---------------------------------------------------------------------------
+
+_ROBUSTNESS_MODULES: list[ConditionSpec] = [
+    ConditionSpec(
+        condition_type="parameter_jitter",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="jitter_pct", param_type="number", required=True,
+                       description="Parameter jitter percentage", default=0.1,
+                       constraints={"minimum": 0.0, "maximum": 0.5}),
+            ParamSchema(name="runs", param_type="integer", required=True,
+                       description="Number of Monte Carlo runs", default=100,
+                       constraints={"minimum": 10, "maximum": 1000}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Monte Carlo parameter jitter robustness test",
+        examples=[{"jitter_pct": 0.1, "runs": 100}],
+        required_columns=[],
+        required_tables=[],
+        context_requirements=[ContextRequirement.PORTFOLIO],
+        preview_support=PreviewSupport.UNSUPPORTED,
+        preview_notes="Robustness test requires backtest context.",
+    ),
+    ConditionSpec(
+        condition_type="random_skip_trades",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="skip_pct", param_type="number", required=True,
+                       description="Percentage of trades to randomly skip", default=0.1,
+                       constraints={"minimum": 0.0, "maximum": 0.5}),
+            ParamSchema(name="runs", param_type="integer", required=True,
+                       description="Number of runs", default=100,
+                       constraints={"minimum": 10, "maximum": 1000}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Monte Carlo random trade skip robustness test",
+        examples=[{"skip_pct": 0.1, "runs": 100}],
+        required_columns=[],
+        required_tables=[],
+        context_requirements=[ContextRequirement.PORTFOLIO],
+        preview_support=PreviewSupport.UNSUPPORTED,
+        preview_notes="Robustness test requires backtest context.",
+    ),
+    ConditionSpec(
+        condition_type="slippage_stress",
+        category=ConditionCategory.FILTER,
+        params=[
+            ParamSchema(name="slippage_pct", param_type="number", required=True,
+                       description="Slippage percentage to stress test", default=0.001,
+                       constraints={"minimum": 0.0, "maximum": 0.05}),
+            ParamSchema(name="commission_pct", param_type="number", required=True,
+                       description="Commission percentage", default=0.0003,
+                       constraints={"minimum": 0.0, "maximum": 0.01}),
+        ],
+        translator=TranslatorDialect.BOTH,
+        description="Stress test with slippage and commission costs",
+        examples=[{"slippage_pct": 0.001, "commission_pct": 0.0003}],
+        required_columns=[],
+        required_tables=[],
+        context_requirements=[ContextRequirement.PORTFOLIO],
+        preview_support=PreviewSupport.UNSUPPORTED,
+        preview_notes="Stress test requires backtest context.",
+    ),
+]
+
+# ---------------------------------------------------------------------------
+# All SQX Modules Combined
+# ---------------------------------------------------------------------------
+
+ALL_SQX_MODULES: list[ConditionSpec] = (
+    _SIGNAL_COMPARISON_MODULES
+    + _OSCILLATOR_MODULES
+    + _VOLATILITY_MODULES
+    + _TREND_MODULES
+    + _PRICE_ACTION_MODULES
+    + _VOLUME_MODULES
+    + _EXIT_MODULES
+    + _FILTER_MODULES
+    + _MONEY_MANAGEMENT_MODULES
+    + _ROBUSTNESS_MODULES
+)
+
+
+def register_sqx_modules(registry: ConditionRegistry) -> None:
+    """Register all SQX-inspired modules to a condition registry."""
+    registry.register_many(ALL_SQX_MODULES)
+
+
+def get_sqx_module_stats() -> dict[str, int]:
+    """Get statistics about SQX modules by category."""
+    from collections import Counter
+    categories = Counter(m.category for m in ALL_SQX_MODULES)
+    return {
+        "total": len(ALL_SQX_MODULES),
+        "entry": categories.get(ConditionCategory.ENTRY, 0),
+        "exit": categories.get(ConditionCategory.EXIT, 0),
+        "filter": categories.get(ConditionCategory.FILTER, 0),
+    }

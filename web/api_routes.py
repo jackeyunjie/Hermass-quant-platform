@@ -37,6 +37,12 @@ from hermass_platform.strategy_lab.e2e_runner import (
     _hash_payload,
     _persist_trades_and_events,
 )
+from hermass_platform.strategy_lab.multi_timeframe_engine import (
+    MultiPeriodEngine,
+    MultiTimeframeEngine,
+    run_multi_period_backtest,
+    run_multi_timeframe_backtest,
+)
 from hermass_platform.strategy_lab.preview_service import PreviewService
 from hermass_platform.strategy_lab.storage import StrategyLabStorage
 
@@ -49,47 +55,35 @@ DSL_VERSION = "strategy_dsl_v2"
 
 STORAGE_DB = os.getenv(
     "STRATEGY_LAB_STORAGE_DB",
-    "outputs/strategy_lab/web_storage.duckdb",
+    os.path.join(os.path.dirname(__file__), "..", "outputs", "strategy_lab", "mvp_e2e_acceptance_storage.duckdb"),
 )
 AUDIT_DB = os.getenv(
     "STRATEGY_LAB_AUDIT_DB",
-    "outputs/strategy_lab/web_audit.duckdb",
+    os.path.join(os.path.dirname(__file__), "..", "outputs", "strategy_lab", "mvp_e2e_acceptance_audit.duckdb"),
 )
-FOUNDATION_DB = os.getenv("FOUNDATION_DB", "data/p116_foundation.duckdb")
-STATE_CUBE_DB = os.getenv("STATE_CUBE_DB", "data/state_cube.duckdb")
+FOUNDATION_DB = os.getenv(
+    "FOUNDATION_DB",
+    os.path.join(os.path.dirname(__file__), "..", "outputs", "benchmarks", "_synthetic_tmp.duckdb"),
+)
+STATE_CUBE_DB = os.getenv(
+    "STATE_CUBE_DB",
+    os.path.join(os.path.dirname(__file__), "..", "outputs", "strategy_lab", "mvp_e2e_acceptance_storage.duckdb"),
+)
 
 
 # ---------------------------------------------------------------------------
-# Auth helper for API endpoints
-# ---------------------------------------------------------------------------
-
-def _require_api_auth(request: Request) -> None:
-    """Raise 403 if invite token is missing or invalid.
-
-    API endpoints should return 403 (not redirect) since they are
-    consumed programmatically, not by browsers.
-    """
-    token = _check_invite_token(request)
-    if token is None:
-        raise HTTPException(
-            status_code=403,
-            detail="Authentication required. Provide a valid invite token via ?invite=TOKEN query param or cookie."
-        )
-
-
-# ---------------------------------------------------------------------------
-# Request models
+# Request Models
 # ---------------------------------------------------------------------------
 
 
 class GenerateRequest(BaseModel):
-    strategy_id: str = Field(..., pattern=r"^[a-z0-9_]+$")
     natural_language: str
+    strategy_id: str = ""
 
 
 class ValidateRequest(BaseModel):
     dsl: dict[str, Any]
-    trace_id: str | None = None
+    trace_id: str = ""
 
 
 class PreviewRequest(BaseModel):
@@ -103,6 +97,30 @@ class BacktestRequest(BaseModel):
     trace_id: str
     start_date: str = "2023-01-01"
     end_date: str = "2024-12-31"
+
+
+class MultiTimeframeBacktestRequest(BaseModel):
+    dsl: dict[str, Any]
+    trace_id: str
+    start_date: str = "2023-01-01"
+    end_date: str = "2024-12-31"
+    timeframes: list[str] = Field(default_factory=lambda: ["D1", "W1"])
+    primary_timeframe: str = "D1"
+    require_all_timeframes: bool = False
+
+
+class BacktestPeriodInput(BaseModel):
+    start_date: str
+    end_date: str
+    label: str = ""
+
+
+class MultiPeriodBacktestRequest(BaseModel):
+    dsl: dict[str, Any]
+    trace_id: str
+    periods: list[BacktestPeriodInput]
+    aggregate_method: str = "concat"
+    min_periods_required: int = 1
 
 
 # ---------------------------------------------------------------------------
@@ -143,60 +161,37 @@ def _validation_result_to_response(
             level=e.level.value,
             code=e.code,
             message=e.message,
-            path=e.path,
+            field=e.field,
         )
 
     def _warn_to_item(w: InternalValidationWarning) -> ValidationErrorItem:
         return ValidationErrorItem(
-            level=w.level.value,
+            level="warning",
             code=w.code,
             message=w.message,
-            path=w.path,
+            field=w.field,
         )
 
     return ValidateStrategyResponse(
         trace_id=trace_id,
-        dsl_version=DSL_VERSION,
         passed=val.passed,
         level=val.level.value,
         errors=[_err_to_item(e) for e in val.errors],
         warnings=[_warn_to_item(w) for w in val.warnings],
+        has_red_line_violation=val.has_red_line_violation,
     )
 
 
 def _engine_backtest_to_response(bt: EngineBacktestResult) -> BacktestResponse:
-    """Convert internal BacktestResult to API response model."""
-    from hermass_platform.strategy_lab.api_models import BacktestMetrics
-
-    metrics = bt.metrics or {}
-    status: Any = (
-        "failed" if bt.status == "failed"
-        else "partial" if bt.risk_flags
-        else "success"
-    )
+    """Convert EngineBacktestResult to API response model."""
     return BacktestResponse(
         trace_id=bt.trace_id or "",
-        dsl_version=DSL_VERSION,
-        status=status,
-        mode=bt.mode or "light_stub",
-        metrics=BacktestMetrics(
-            total_return=metrics.get("total_return"),
-            annual_return=metrics.get("annual_return"),
-            sharpe_ratio=metrics.get("sharpe_ratio"),
-            max_drawdown=metrics.get("max_drawdown"),
-            profit_factor=metrics.get("profit_factor"),
-            trade_count=metrics.get("trade_count"),
-            total_trades=metrics.get("total_trades"),
-            win_rate=metrics.get("win_rate"),
-            avg_holding_days=metrics.get("avg_holding_days"),
-            turnover=metrics.get("turnover"),
-            cost_total=metrics.get("cost_total"),
-        ),
-        risk_flags=bt.risk_flags or [],
-        warnings=bt.warnings or [],
-        trade_count=metrics.get("trade_count"),
-        daily_curve=bt.daily_curve[:100] if bt.daily_curve else [],
+        status=bt.status,
+        mode=bt.mode,
+        metrics=bt.metrics,
+        total_trades=len(bt.trades) if bt.trades else 0,
         trades=bt.trades[:100] if bt.trades else [],
+        risk_flags=bt.risk_flags,
         state_breakdown=bt.state_breakdown or {},
         data_version=bt.data_version,
         elapsed_seconds=bt.elapsed_seconds,
@@ -204,6 +199,16 @@ def _engine_backtest_to_response(bt: EngineBacktestResult) -> BacktestResponse:
         daily_curve_total_count=len(bt.daily_curve) if bt.daily_curve else 0,
         trades_truncated=(bt.trades is not None and len(bt.trades) > 100),
     )
+
+
+def _require_api_auth(request: Request) -> None:
+    """Require authentication for API endpoints."""
+    token = _check_invite_token(request)
+    if token is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Authentication required. Please provide a valid invite token via cookie or query parameter.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -490,6 +495,217 @@ async def api_backtest(request: Request, req: BacktestRequest) -> dict[str, Any]
         "trace_id": req.trace_id,
         "success": response.status != "failed",
         "backtest": response.model_dump(),
+    }
+
+
+@router.post("/backtest/multi-timeframe")
+async def api_multi_timeframe_backtest(request: Request, req: MultiTimeframeBacktestRequest) -> dict[str, Any]:
+    """Run multi-timeframe backtest across D1/W1/MN1 simultaneously."""
+    _require_api_auth(request)
+    try:
+        dsl_obj = StrategyDSL.model_validate(req.dsl)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": [str(exc)],
+        }) from exc
+
+    # 红线校验
+    validation = validate_dsl(dsl_obj)
+    if validation.has_red_line_violation:
+        red_line_result = {
+            "passed": False,
+            "triggered_rules": [
+                e.code for e in validation.errors if e.level == ValidationLevel.RED_LINE
+            ],
+        }
+        raise HTTPException(status_code=403, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": [f"Red line violation: {e.code}" for e in validation.errors if e.level == ValidationLevel.RED_LINE],
+            "red_line_result": red_line_result,
+        })
+
+    # Update DSL with multi-timeframe config
+    dsl_dict = dsl_obj.model_dump()
+    dsl_dict["multi_timeframe"] = {
+        "timeframes": req.timeframes,
+        "primary_timeframe": req.primary_timeframe,
+        "require_all_timeframes": req.require_all_timeframes,
+    }
+    dsl_obj = StrategyDSL.model_validate(dsl_dict)
+
+    foundation = _foundation_db_path()
+    if foundation is None:
+        raise HTTPException(status_code=503, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": ["Foundation DB not found"],
+        })
+
+    try:
+        result = run_multi_timeframe_backtest(
+            dsl=dsl_obj,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            foundation_db=foundation,
+        )
+    except Exception as exc:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": [str(exc)],
+        }) from exc
+
+    # Convert to response
+    timeframe_results = []
+    for tf in result.timeframe_results:
+        timeframe_results.append({
+            "timeframe": tf.timeframe,
+            "signal_count": tf.signal_count,
+            "agreement_rate": tf.agreement_rate,
+            "metrics": tf.result.metrics if tf.result.metrics else {},
+            "status": tf.result.status,
+        })
+
+    _audit_logger().log_backtest(
+        trace_id=req.trace_id,
+        strategy_id=dsl_obj.strategy_id,
+        dsl_version=DSL_VERSION,
+        input_payload={
+            "dsl": req.dsl,
+            "start_date": req.start_date,
+            "end_date": req.end_date,
+            "timeframes": req.timeframes,
+            "primary_timeframe": req.primary_timeframe,
+        },
+        output_payload={
+            "overall_metrics": result.overall_metrics,
+            "timeframe_results": timeframe_results,
+            "cross_timeframe_signals": result.cross_timeframe_signals,
+        },
+        red_line_result={"passed": True, "triggered_rules": []},
+    )
+
+    return {
+        "trace_id": req.trace_id,
+        "success": result.status != "failed",
+        "multi_timeframe": {
+            "primary_timeframe": result.primary_timeframe,
+            "overall_metrics": result.overall_metrics,
+            "timeframe_results": timeframe_results,
+            "cross_timeframe_signals": result.cross_timeframe_signals,
+            "elapsed_seconds": result.elapsed_seconds,
+            "status": result.status,
+            "warnings": result.warnings,
+        },
+    }
+
+
+@router.post("/backtest/multi-period")
+async def api_multi_period_backtest(request: Request, req: MultiPeriodBacktestRequest) -> dict[str, Any]:
+    """Run multi-period backtest across multiple date ranges."""
+    _require_api_auth(request)
+    try:
+        dsl_obj = StrategyDSL.model_validate(req.dsl)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": [str(exc)],
+        }) from exc
+
+    # 红线校验
+    validation = validate_dsl(dsl_obj)
+    if validation.has_red_line_violation:
+        red_line_result = {
+            "passed": False,
+            "triggered_rules": [
+                e.code for e in validation.errors if e.level == ValidationLevel.RED_LINE
+            ],
+        }
+        raise HTTPException(status_code=403, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": [f"Red line violation: {e.code}" for e in validation.errors if e.level == ValidationLevel.RED_LINE],
+            "red_line_result": red_line_result,
+        })
+
+    # Update DSL with multi-period config
+    dsl_dict = dsl_obj.model_dump()
+    dsl_dict["multi_period"] = {
+        "periods": [
+            {"start_date": p.start_date, "end_date": p.end_date, "label": p.label}
+            for p in req.periods
+        ],
+        "aggregate_method": req.aggregate_method,
+        "min_periods_required": req.min_periods_required,
+    }
+    dsl_obj = StrategyDSL.model_validate(dsl_dict)
+
+    foundation = _foundation_db_path()
+    if foundation is None:
+        raise HTTPException(status_code=503, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": ["Foundation DB not found"],
+        })
+
+    try:
+        result = run_multi_period_backtest(
+            dsl=dsl_obj,
+            foundation_db=foundation,
+        )
+    except Exception as exc:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": [str(exc)],
+        }) from exc
+
+    # Convert to response
+    period_results = []
+    for p in result.period_results:
+        period_results.append({
+            "label": p.period_label,
+            "start_date": p.start_date,
+            "end_date": p.end_date,
+            "metrics": p.result.metrics if p.result.metrics else {},
+            "trade_count": len(p.result.trades) if p.result.trades else 0,
+            "status": p.status,
+        })
+
+    _audit_logger().log_backtest(
+        trace_id=req.trace_id,
+        strategy_id=dsl_obj.strategy_id,
+        dsl_version=DSL_VERSION,
+        input_payload={
+            "dsl": req.dsl,
+            "periods": [p.model_dump() for p in req.periods],
+            "aggregate_method": req.aggregate_method,
+        },
+        output_payload={
+            "overall_metrics": result.overall_metrics,
+            "period_results": period_results,
+            "period_comparison": result.period_comparison,
+        },
+        red_line_result={"passed": True, "triggered_rules": []},
+    )
+
+    return {
+        "trace_id": req.trace_id,
+        "success": result.status != "failed",
+        "multi_period": {
+            "overall_metrics": result.overall_metrics,
+            "period_results": period_results,
+            "period_comparison": result.period_comparison,
+            "elapsed_seconds": result.elapsed_seconds,
+            "status": result.status,
+            "warnings": result.warnings,
+        },
     }
 
 

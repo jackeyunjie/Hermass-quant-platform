@@ -78,6 +78,21 @@ def translate_condition(
         "stop_loss_pct": _translate_stop_loss_pct,
         "take_profit_pct": _translate_take_profit_pct,
         "limit_up_filter": _translate_limit_up_filter,
+        # SQX Expansion
+        "rsi_threshold": _translate_rsi_threshold,
+        "macd_cross": _translate_macd_cross,
+        "bollinger_breakout": _translate_bollinger_breakout,
+        "ma_bullish_alignment": _translate_ma_bullish_alignment,
+        "price_above_ma": _translate_price_above_ma,
+        "atr_trailing_stop": _translate_atr_trailing_stop,
+        "exit_after_bars": _translate_exit_after_bars,
+        "indicator_reversal_exit": _translate_indicator_reversal_exit,
+        "liquidity_filter": _translate_liquidity_filter,
+        "volatility_filter": _translate_volatility_filter,
+        "time_filter": _translate_time_filter,
+        "st_new_stock_filter": _translate_st_new_stock_filter,
+        "max_position_pct": _translate_max_position_pct,
+        "max_drawdown_stop": _translate_max_drawdown_stop,
     }
 
     translator = translator_map.get(condition.condition_type)
@@ -532,4 +547,529 @@ def _translate_limit_up_filter(
         polars_expr=polars,
         required_columns=[col],
         required_tables=["daily_bars"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# SQX-INSPIRED EXPANSION TRANSLATORS
+# ---------------------------------------------------------------------------
+
+# -- Oscillator Entry Conditions --------------------------------------------
+
+
+def _translate_rsi_threshold(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """RSI threshold comparison."""
+    period = params["period"]
+    operator = params["operator"]
+    value = params["value"]
+    col = f"rsi_{period}"
+
+    if dialect == "duckdb":
+        sql = f"{col} {operator} {value}"
+    else:
+        sql = None
+
+    if dialect == "polars":
+        polars = f'pl.col("{col}") {operator} {value}'
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col],
+        required_tables=["daily_bars"],
+    )
+
+
+def _translate_macd_cross(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """MACD line crosses signal line."""
+    fast = params["fast"]
+    slow = params["slow"]
+    signal = params["signal"]
+    direction = params["direction"]
+    col_macd = f"macd_{fast}_{slow}"
+    col_signal = f"macd_signal_{fast}_{slow}_{signal}"
+
+    if direction == "bullish":
+        if dialect == "duckdb":
+            window = "PARTITION BY symbol ORDER BY date"
+            sql = (
+                f"({col_macd} > {col_signal} AND "
+                f"lag({col_macd}) OVER ({window}) <= lag({col_signal}) OVER ({window}))"
+            )
+        else:
+            sql = None
+        if dialect == "polars":
+            polars = (
+                f'(pl.col("{col_macd}") > pl.col("{col_signal}")) & '
+                f'(pl.col("{col_macd}").shift(1) <= pl.col("{col_signal}").shift(1))'
+            )
+        else:
+            polars = None
+    else:  # bearish
+        if dialect == "duckdb":
+            window = "PARTITION BY symbol ORDER BY date"
+            sql = (
+                f"({col_macd} < {col_signal} AND "
+                f"lag({col_macd}) OVER ({window}) >= lag({col_signal}) OVER ({window}))"
+            )
+        else:
+            sql = None
+        if dialect == "polars":
+            polars = (
+                f'(pl.col("{col_macd}") < pl.col("{col_signal}")) & '
+                f'(pl.col("{col_macd}").shift(1) >= pl.col("{col_signal}").shift(1))'
+            )
+        else:
+            polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col_macd, col_signal],
+        required_tables=["daily_bars"],
+    )
+
+
+def _translate_bollinger_breakout(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Price breaks Bollinger Band."""
+    period = params["period"]
+    std_dev = params["std_dev"]
+    direction = params["direction"]
+    col_close = "close"
+    col_upper = f"bb_upper_{period}_{std_dev}"
+    col_lower = f"bb_lower_{period}_{std_dev}"
+
+    if direction == "upper":
+        if dialect == "duckdb":
+            window = "PARTITION BY symbol ORDER BY date"
+            sql = (
+                f"({col_close} > {col_upper} AND "
+                f"lag({col_close}) OVER ({window}) <= lag({col_upper}) OVER ({window}))"
+            )
+        else:
+            sql = None
+        if dialect == "polars":
+            polars = (
+                f'(pl.col("{col_close}") > pl.col("{col_upper}")) & '
+                f'(pl.col("{col_close}").shift(1) <= pl.col("{col_upper}").shift(1))'
+            )
+        else:
+            polars = None
+    else:  # lower
+        if dialect == "duckdb":
+            window = "PARTITION BY symbol ORDER BY date"
+            sql = (
+                f"({col_close} < {col_lower} AND "
+                f"lag({col_close}) OVER ({window}) >= lag({col_lower}) OVER ({window}))"
+            )
+        else:
+            sql = None
+        if dialect == "polars":
+            polars = (
+                f'(pl.col("{col_close}") < pl.col("{col_lower}")) & '
+                f'(pl.col("{col_close}").shift(1) >= pl.col("{col_lower}").shift(1))'
+            )
+        else:
+            polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col_close, col_upper, col_lower],
+        required_tables=["daily_bars"],
+    )
+
+
+# -- Trend/MA Variants ------------------------------------------------------
+
+
+def _translate_ma_bullish_alignment(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Multiple MAs in bullish alignment."""
+    ma_periods = params["ma_periods"]
+    cols = [f"ma_{p}" for p in ma_periods]
+
+    if len(cols) < 2:
+        raise ValueError("ma_periods must have at least 2 elements")
+
+    if dialect == "duckdb":
+        conditions = []
+        for i in range(len(cols) - 1):
+            conditions.append(f"{cols[i]} > {cols[i + 1]}")
+        sql = " AND ".join(conditions)
+    else:
+        sql = None
+
+    if dialect == "polars":
+        conditions = []
+        for i in range(len(cols) - 1):
+            conditions.append(f'(pl.col("{cols[i]}") > pl.col("{cols[i + 1]}"))')
+        polars = " & ".join(conditions)
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=cols,
+        required_tables=["daily_bars"],
+    )
+
+
+def _translate_price_above_ma(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Price above MA for N consecutive bars."""
+    ma_period = params["ma_period"]
+    consecutive_bars = params.get("consecutive_bars", 1)
+    col_price = "close"
+    col_ma = f"ma_{ma_period}"
+
+    if dialect == "duckdb":
+        if consecutive_bars == 1:
+            sql = f"{col_price} > {col_ma}"
+        else:
+            # For N consecutive bars, we check current and N-1 lags
+            parts = [f"{col_price} > {col_ma}"]
+            window = "PARTITION BY symbol ORDER BY date"
+            for i in range(1, consecutive_bars):
+                parts.append(f"lag({col_price}, {i}) OVER ({window}) > lag({col_ma}, {i}) OVER ({window})")
+            sql = " AND ".join(parts)
+    else:
+        sql = None
+
+    if dialect == "polars":
+        if consecutive_bars == 1:
+            polars = f'(pl.col("{col_price}") > pl.col("{col_ma}"))'
+        else:
+            parts = [f'(pl.col("{col_price}") > pl.col("{col_ma}"))']
+            for i in range(1, consecutive_bars):
+                parts.append(f'(pl.col("{col_price}").shift({i}) > pl.col("{col_ma}").shift({i}))')
+            polars = " & ".join(parts)
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col_price, col_ma],
+        required_tables=["daily_bars"],
+    )
+
+
+# -- Advanced Exit Conditions -----------------------------------------------
+
+
+def _translate_atr_trailing_stop(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """ATR trailing stop (Chandelier-style)."""
+    atr_period = params["atr_period"]
+    multiplier = params["multiplier"]
+    col_close = "close"
+    col_high = "high"
+    col_atr = f"atr_{atr_period}"
+
+    if dialect == "duckdb":
+        # Stop = highest_high_since_entry - multiplier * ATR
+        sql = f"{col_close} <= (max_high_since_entry - {multiplier} * {col_atr})"
+    else:
+        sql = None
+
+    if dialect == "polars":
+        polars = f'pl.col("{col_close}") <= (pl.col("max_high_since_entry") - {multiplier} * pl.col("{col_atr}"))'
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col_close, col_high, col_atr],
+        required_tables=["daily_bars", "positions"],
+    )
+
+
+def _translate_exit_after_bars(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Exit after holding N bars."""
+    max_bars = params["max_bars"]
+    col = "bars_since_entry"
+
+    if dialect == "duckdb":
+        sql = f"{col} >= {max_bars}"
+    else:
+        sql = None
+
+    if dialect == "polars":
+        polars = f'pl.col("{col}") >= {max_bars}'
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col],
+        required_tables=["positions"],
+    )
+
+
+def _translate_indicator_reversal_exit(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Exit when indicator reverses from extreme."""
+    indicator = params["indicator"]
+    period = params["period"]
+    direction = params["direction"]
+    col = f"{indicator}_{period}"
+
+    if direction == "overbought":
+        # Exit when indicator was above extreme and now falling
+        if indicator == "rsi":
+            threshold = 70
+        elif indicator == "cci":
+            threshold = 100
+        else:  # macd
+            threshold = 0
+        if dialect == "duckdb":
+            window = "PARTITION BY symbol ORDER BY date"
+            sql = (
+                f"({col} < {threshold} AND "
+                f"lag({col}) OVER ({window}) >= {threshold})"
+            )
+        else:
+            sql = None
+        if dialect == "polars":
+            polars = (
+                f'(pl.col("{col}") < {threshold}) & '
+                f'(pl.col("{col}").shift(1) >= {threshold})'
+            )
+        else:
+            polars = None
+    else:  # oversold
+        if indicator == "rsi":
+            threshold = 30
+        elif indicator == "cci":
+            threshold = -100
+        else:  # macd
+            threshold = 0
+        if dialect == "duckdb":
+            window = "PARTITION BY symbol ORDER BY date"
+            sql = (
+                f"({col} > {threshold} AND "
+                f"lag({col}) OVER ({window}) <= {threshold})"
+            )
+        else:
+            sql = None
+        if dialect == "polars":
+            polars = (
+                f'(pl.col("{col}") > {threshold}) & '
+                f'(pl.col("{col}").shift(1) <= {threshold})'
+            )
+        else:
+            polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col],
+        required_tables=["daily_bars"],
+    )
+
+
+# -- Enhanced Filter Conditions ---------------------------------------------
+
+
+def _translate_liquidity_filter(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Filter by minimum turnover."""
+    min_turnover = params["min_turnover"]
+    col = "amount"
+
+    if dialect == "duckdb":
+        sql = f"{col} >= {min_turnover}"
+    else:
+        sql = None
+
+    if dialect == "polars":
+        polars = f'pl.col("{col}") >= {min_turnover}'
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col],
+        required_tables=["daily_bars"],
+    )
+
+
+def _translate_volatility_filter(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Filter by volatility level (ATR/close ratio)."""
+    atr_period = params["atr_period"]
+    operator = params["operator"]
+    threshold_pct = params["threshold_pct"]
+    col_atr = f"atr_{atr_period}"
+    col_close = "close"
+
+    if dialect == "duckdb":
+        sql = f"(CAST({col_atr} AS DOUBLE) / NULLIF({col_close}, 0)) {operator} {threshold_pct}"
+    else:
+        sql = None
+
+    if dialect == "polars":
+        polars = (
+            f'(pl.col("{col_atr}").cast(pl.Float64) / '
+            f'pl.col("{col_close}").replace(0, None)) {operator} {threshold_pct}'
+        )
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col_atr, col_close],
+        required_tables=["daily_bars"],
+    )
+
+
+def _translate_time_filter(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Filter by trading time windows."""
+    month_range = params.get("month_range", [])
+    day_of_week = params.get("day_of_week", [])
+    exclude_holidays = params.get("exclude_holidays", True)
+
+    conditions = []
+    if month_range:
+        months = ", ".join(str(m) for m in month_range)
+        conditions.append(f"month IN ({months})")
+    if day_of_week:
+        days = ", ".join(str(d) for d in day_of_week)
+        conditions.append(f"day_of_week IN ({days})")
+    if exclude_holidays:
+        conditions.append("is_holiday = FALSE")
+
+    if dialect == "duckdb":
+        if conditions:
+            sql = " AND ".join(conditions)
+        else:
+            sql = "1=1"
+    else:
+        sql = None
+
+    if dialect == "polars":
+        if conditions:
+            # Simplified polars representation
+            polars = " & ".join(f'pl.col("{c.split()[0]}") {c.split()[1]} {c.split()[2]}' for c in conditions)
+        else:
+            polars = "pl.lit(True)"
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=["month", "day_of_week", "is_holiday"],
+        required_tables=["daily_bars"],
+    )
+
+
+def _translate_st_new_stock_filter(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Filter out ST and new stocks."""
+    exclude_st = params.get("exclude_st", True)
+    max_listing_days = params.get("max_listing_days", 60)
+
+    conditions = []
+    if exclude_st:
+        conditions.append("is_st = FALSE")
+    if max_listing_days is not None:
+        conditions.append(f"days_since_listing >= {max_listing_days}")
+
+    if dialect == "duckdb":
+        if conditions:
+            sql = " AND ".join(conditions)
+        else:
+            sql = "1=1"
+    else:
+        sql = None
+
+    if dialect == "polars":
+        if conditions:
+            polars_parts = []
+            if exclude_st:
+                polars_parts.append('(pl.col("is_st") == False)')
+            if max_listing_days is not None:
+                polars_parts.append(f'(pl.col("days_since_listing") >= {max_listing_days})')
+            polars = " & ".join(polars_parts) if polars_parts else "pl.lit(True)"
+        else:
+            polars = "pl.lit(True)"
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=["is_st", "days_since_listing"],
+        required_tables=["stock_info"],
+    )
+
+
+# -- Risk / Money Management ------------------------------------------------
+
+
+def _translate_max_position_pct(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Max position percentage (red-line enforced, no SQL translation)."""
+    # This is a meta-condition enforced by red-line validator, not translated to SQL
+    return TranslationResult(
+        sql_expr="1=1",
+        polars_expr="pl.lit(True)",
+        required_columns=[],
+        required_tables=[],
+    )
+
+
+def _translate_max_drawdown_stop(
+    params: dict, dialect: Literal["duckdb", "polars"]
+) -> TranslationResult:
+    """Emergency stop on portfolio drawdown."""
+    value = params["value"]
+    col_equity = "portfolio_equity"
+    col_peak = "portfolio_peak"
+
+    if dialect == "duckdb":
+        sql = f"({col_equity} / NULLIF({col_peak}, 0)) <= {1.0 - value}"
+    else:
+        sql = None
+
+    if dialect == "polars":
+        polars = (
+            f'(pl.col("{col_equity}") / pl.col("{col_peak}").replace(0, None)) '
+            f'<= {1.0 - value}'
+        )
+    else:
+        polars = None
+
+    return TranslationResult(
+        sql_expr=sql,
+        polars_expr=polars,
+        required_columns=[col_equity, col_peak],
+        required_tables=["portfolio"],
     )

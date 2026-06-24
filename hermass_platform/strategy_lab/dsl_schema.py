@@ -23,6 +23,63 @@ Operator = Literal[">", "<", ">=", "<=", "==", "!=", "in", "not_in"]
 # Sub-models
 # ---------------------------------------------------------------------------
 
+class BacktestPeriod(BaseModel):
+    """A single backtest time period for multi-period analysis."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    start_date: str = Field(
+        ...,
+        description="Start date (YYYY-MM-DD)",
+    )
+    end_date: str = Field(
+        ...,
+        description="End date (YYYY-MM-DD)",
+    )
+    label: str = Field(
+        default="",
+        description="Period label (e.g. '2020-2021牛市', '2022熊市')",
+    )
+
+
+class MultiTimeframeConfig(BaseModel):
+    """Multi-timeframe analysis configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    timeframes: list[str] = Field(
+        default_factory=lambda: ["D1"],
+        description="List of timeframes to analyze (D1=日线, W1=周线, MN1=月线)",
+    )
+    primary_timeframe: str = Field(
+        default="D1",
+        description="Primary timeframe for signal generation",
+    )
+    require_all_timeframes: bool = Field(
+        default=False,
+        description="Require all timeframes to agree (multi-timeframe confirmation)",
+    )
+
+
+class MultiPeriodConfig(BaseModel):
+    """Multi-period backtest configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    periods: list[BacktestPeriod] = Field(
+        default_factory=list,
+        description="List of backtest periods",
+    )
+    aggregate_method: Literal["concat", "average", "weighted"] = Field(
+        default="concat",
+        description="How to aggregate results across periods",
+    )
+    min_periods_required: int = Field(
+        default=1,
+        ge=1,
+        description="Minimum number of periods that must succeed",
+    )
+
 class Hypothesis(BaseModel):
     """Strategy hypothesis and market regime assumptions."""
 
@@ -284,6 +341,14 @@ class StrategyDSL(BaseModel):
     metadata: Metadata = Field(
         default_factory=Metadata,
         description="Optional strategy metadata",
+    )
+    multi_timeframe: MultiTimeframeConfig = Field(
+        default_factory=MultiTimeframeConfig,
+        description="Multi-timeframe analysis configuration",
+    )
+    multi_period: MultiPeriodConfig = Field(
+        default_factory=MultiPeriodConfig,
+        description="Multi-period backtest configuration",
     )
 
     @field_validator("strategy_id")

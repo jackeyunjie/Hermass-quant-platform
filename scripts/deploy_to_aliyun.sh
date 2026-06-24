@@ -34,8 +34,10 @@ pip3 install --user -e .
 
 # 5. 配置环境变量
 echo "[5/8] 配置环境变量..."
+# 注意：HERMASS_M3_INVITE_TOKENS 应在服务器上手动配置，不要提交到代码仓库
 cat > $APP_DIR/.env << 'EOF'
-HERMASS_M3_INVITE_TOKENS=VFmDwizfH8kkj3Gz09lq_A,cfIPwHmW0G9rjm4rDQuHBA,AlLg1MjVVC0a6SuY-4EGOA,IjDV09cbRTk_NCw7VKZpXQ,Jlww1D1kOwJEfz4oDSkJgA
+# 请在服务器上设置 HERMASS_M3_INVITE_TOKENS 环境变量
+# export HERMASS_M3_INVITE_TOKENS=your_tokens_here
 STRATEGY_LAB_STORAGE_DB=outputs/strategy_lab/web_storage.duckdb
 STRATEGY_LAB_AUDIT_DB=outputs/strategy_lab/web_audit.duckdb
 FOUNDATION_DB=data/p116_foundation.duckdb

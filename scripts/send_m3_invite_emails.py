@@ -24,19 +24,20 @@ from datetime import datetime
 SMTP_HOST = "smtp.qq.com"
 SMTP_PORT = 465
 SMTP_USER = "1300893414@qq.com"
-SMTP_PASS = "dyhqeduaqsrnihag"  # SMTP 授权码
+# SMTP 授权码应从环境变量读取，不要硬编码
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+if not SMTP_PASS:
+    raise ValueError("请设置环境变量 SMTP_PASS")
 
 # 服务器地址（替换 <host>）
 HOST = "quant.supertrader.world"
 
 # 收件人列表
 # 格式: (邮箱, 称呼, pilot_id, user_type, token)
+# token 应从环境变量或安全存储读取
 RECIPIENTS = [
-    # pilot-02: 策略研究员
-    ("554732319@qq.com", "朋友", "pilot-02", "策略研究员", "cfIPwHmW0G9rjm4rDQuHBA"),
-    # pilot-03: 私募量化研究员
-    ("3393639019@qq.com", "朋友", "pilot-03", "私募量化研究员", "AlLg1MjVVC0a6SuY-4EGOA"),
-    # 请添加更多收件人...
+    # 示例：("邮箱", "称呼", "pilot-id", "类型", "token")
+    # 请从环境变量 HERMASS_M3_INVITE_TOKENS 获取 token
 ]
 
 # ============ 邮件模板 ============

@@ -441,6 +441,49 @@ async def diagnosis_run(
     audit = _audit_logger()
     strategy_id = dsl_snapshot.get("strategy_id", "unknown")
 
+    # 红线校验：preview/backtest 前必须重新执行 validate_dsl
+    validation = validate_dsl(dsl_obj)
+    if validation.has_red_line_violation:
+        red_line_result = {
+            "passed": False,
+            "triggered_rules": [
+                e.code for e in validation.errors if e.level == ValidationLevel.RED_LINE
+            ],
+        }
+        errors.append(f"Red line violation: {[e.code for e in validation.errors if e.level == ValidationLevel.RED_LINE]}")
+        if stage == "preview":
+            audit.log_preview(
+                trace_id=trace_id,
+                strategy_id=strategy_id,
+                dsl_version=DSL_VERSION,
+                input_payload=dsl_snapshot,
+                output_payload={"error": "Red line violation", "validation": validation.model_dump()},
+                red_line_result=red_line_result,
+            )
+        else:
+            audit.log_backtest(
+                trace_id=trace_id,
+                strategy_id=strategy_id,
+                dsl_version=DSL_VERSION,
+                input_payload=dsl_snapshot,
+                output_payload={"error": "Red line violation", "validation": validation.model_dump()},
+                red_line_result=red_line_result,
+            )
+        return templates.TemplateResponse(
+            request,
+            "diagnosis.html",
+            _ctx(
+                request,
+                trace_id=trace_id,
+                dsl_snapshot=dsl_snapshot,
+                preview=None,
+                backtest_summary=None,
+                errors=errors,
+                run_tag=run_tag,
+                disclaimer=_disclaimer(),
+            ),
+        )
+
     try:
         if stage == "preview":
             service = PreviewService()

@@ -314,6 +314,30 @@ async def api_preview(req: PreviewRequest) -> dict[str, Any]:
             "errors": [str(exc)],
         }) from exc
 
+    # 红线校验：preview 前必须重新执行 validate_dsl
+    validation = validate_dsl(dsl_obj)
+    if validation.has_red_line_violation:
+        red_line_result = {
+            "passed": False,
+            "triggered_rules": [
+                e.code for e in validation.errors if e.level == ValidationLevel.RED_LINE
+            ],
+        }
+        _audit_logger().log_preview(
+            trace_id=req.trace_id,
+            strategy_id=dsl_obj.strategy_id,
+            dsl_version=DSL_VERSION,
+            input_payload=req.dsl,
+            output_payload={"error": "Red line violation", "validation": validation.model_dump()},
+            red_line_result=red_line_result,
+        )
+        raise HTTPException(status_code=403, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": [f"Red line violation: {e.code}" for e in validation.errors if e.level == ValidationLevel.RED_LINE],
+            "red_line_result": red_line_result,
+        })
+
     service = PreviewService()
     preview = service.preview(dsl_obj, data_source=req.data_source, trace_id=req.trace_id)
 
@@ -344,6 +368,30 @@ async def api_backtest(req: BacktestRequest) -> dict[str, Any]:
             "success": False,
             "errors": [str(exc)],
         }) from exc
+
+    # 红线校验：backtest 前必须重新执行 validate_dsl
+    validation = validate_dsl(dsl_obj)
+    if validation.has_red_line_violation:
+        red_line_result = {
+            "passed": False,
+            "triggered_rules": [
+                e.code for e in validation.errors if e.level == ValidationLevel.RED_LINE
+            ],
+        }
+        _audit_logger().log_backtest(
+            trace_id=req.trace_id,
+            strategy_id=dsl_obj.strategy_id,
+            dsl_version=DSL_VERSION,
+            input_payload=req.dsl,
+            output_payload={"error": "Red line violation", "validation": validation.model_dump()},
+            red_line_result=red_line_result,
+        )
+        raise HTTPException(status_code=403, detail={
+            "trace_id": req.trace_id,
+            "success": False,
+            "errors": [f"Red line violation: {e.code}" for e in validation.errors if e.level == ValidationLevel.RED_LINE],
+            "red_line_result": red_line_result,
+        })
 
     foundation = _foundation_db_path()
     state_cube = _state_cube_db_path()

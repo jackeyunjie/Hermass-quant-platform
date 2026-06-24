@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from hermass_platform.strategy_lab.api_models import (
@@ -40,6 +40,8 @@ from hermass_platform.strategy_lab.e2e_runner import (
 from hermass_platform.strategy_lab.preview_service import PreviewService
 from hermass_platform.strategy_lab.storage import StrategyLabStorage
 
+from .onboarding_routes import _check_invite_token
+
 
 router = APIRouter(prefix="/api/strategy-lab", tags=["strategy-lab-api"])
 
@@ -55,6 +57,24 @@ AUDIT_DB = os.getenv(
 )
 FOUNDATION_DB = os.getenv("FOUNDATION_DB", "data/p116_foundation.duckdb")
 STATE_CUBE_DB = os.getenv("STATE_CUBE_DB", "data/state_cube.duckdb")
+
+
+# ---------------------------------------------------------------------------
+# Auth helper for API endpoints
+# ---------------------------------------------------------------------------
+
+def _require_api_auth(request: Request) -> None:
+    """Raise 403 if invite token is missing or invalid.
+
+    API endpoints should return 403 (not redirect) since they are
+    consumed programmatically, not by browsers.
+    """
+    token = _check_invite_token(request)
+    if token is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Authentication required. Provide a valid invite token via ?invite=TOKEN query param or cookie."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +212,9 @@ def _engine_backtest_to_response(bt: EngineBacktestResult) -> BacktestResponse:
 
 
 @router.post("/generate")
-async def api_generate(req: GenerateRequest) -> dict[str, Any]:
+async def api_generate(request: Request, req: GenerateRequest) -> dict[str, Any]:
     """Generate DSL from Chinese natural language and validate it."""
+    _require_api_auth(request)
     trace_id = str(uuid4())
     audit = _audit_logger()
     errors: list[str] = []
@@ -263,8 +284,9 @@ async def api_generate(req: GenerateRequest) -> dict[str, Any]:
 
 
 @router.post("/validate")
-async def api_validate(req: ValidateRequest) -> dict[str, Any]:
+async def api_validate(request: Request, req: ValidateRequest) -> dict[str, Any]:
     """Validate a DSL payload."""
+    _require_api_auth(request)
     trace_id = req.trace_id or str(uuid4())
     try:
         strategy_id = req.dsl.get("strategy_id", "unknown")
@@ -303,8 +325,9 @@ async def api_validate(req: ValidateRequest) -> dict[str, Any]:
 
 
 @router.post("/preview")
-async def api_preview(req: PreviewRequest) -> dict[str, Any]:
+async def api_preview(request: Request, req: PreviewRequest) -> dict[str, Any]:
     """Run condition preview for a DSL."""
+    _require_api_auth(request)
     try:
         dsl_obj = StrategyDSL.model_validate(req.dsl)
     except Exception as exc:
@@ -358,8 +381,9 @@ async def api_preview(req: PreviewRequest) -> dict[str, Any]:
 
 
 @router.post("/backtest")
-async def api_backtest(req: BacktestRequest) -> dict[str, Any]:
+async def api_backtest(request: Request, req: BacktestRequest) -> dict[str, Any]:
     """Run light backtest for a DSL and persist results."""
+    _require_api_auth(request)
     try:
         dsl_obj = StrategyDSL.model_validate(req.dsl)
     except Exception as exc:
@@ -470,8 +494,9 @@ async def api_backtest(req: BacktestRequest) -> dict[str, Any]:
 
 
 @router.get("/backtest/{trace_id}")
-async def api_get_backtest(trace_id: str) -> dict[str, Any]:
+async def api_get_backtest(request: Request, trace_id: str) -> dict[str, Any]:
     """Retrieve a persisted backtest result by trace_id."""
+    _require_api_auth(request)
     storage = _storage()
     backtest = storage.get_backtest(trace_id)
     if not backtest:

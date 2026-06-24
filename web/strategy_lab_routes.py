@@ -15,7 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Form, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from hermass_platform.strategy_lab.api_models import (
@@ -39,6 +39,8 @@ from hermass_platform.strategy_lab.dsl_validator import ValidationLevel, validat
 from hermass_platform.strategy_lab.e2e_runner import NLToDSLParser
 from hermass_platform.strategy_lab.preview_service import PreviewService
 from hermass_platform.strategy_lab.storage import StrategyLabStorage
+
+from .onboarding_routes import _check_invite_token, _set_invite_cookie, INVITE_COOKIE_NAME
 
 from .data_readiness import (
     default_backtest_run_tag,
@@ -75,6 +77,21 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 def _disclaimer() -> str:
     return "本工具仅用于策略研究与技术验证，不构成投资建议。回测结果不代表未来收益。"
+
+
+def _require_auth_or_redirect(request: Request) -> str | RedirectResponse:
+    """Check invite token; return token if valid, or redirect to login page."""
+    token = _check_invite_token(request)
+    if token is None:
+        # Not authenticated - redirect to login page with return URL
+        current_path = str(request.url.path)
+        if request.url.query:
+            current_path += "?" + str(request.url.query)
+        return RedirectResponse(
+            url=f"/onboarding/login?next={current_path}",
+            status_code=303,
+        )
+    return token
 
 
 def _storage() -> StrategyLabStorage:
@@ -231,6 +248,10 @@ def _validation_result_to_response(
 @router.get("/structuring")
 async def structuring_page(request: Request) -> HTMLResponse:
     """Render the strategy structuring form."""
+    auth = _require_auth_or_redirect(request)
+    if isinstance(auth, RedirectResponse):
+        return auth
+
     return templates.TemplateResponse(
         request,
         "structuring.html",
@@ -349,6 +370,10 @@ async def diagnosis_page(
     trace_id: str | None = Query(None),
 ) -> HTMLResponse:
     """Render the diagnosis form, optionally preloaded by trace_id."""
+    auth = _require_auth_or_redirect(request)
+    if isinstance(auth, RedirectResponse):
+        return auth
+
     dsl_snapshot: dict[str, Any] | None = None
     backtest_summary: dict[str, Any] | None = None
     errors: list[str] = []
@@ -586,6 +611,10 @@ async def evidence_page(
     trace_id: str | None = Query(None),
 ) -> HTMLResponse:
     """Render audit timeline and stored trade evidence for a trace_id."""
+    auth = _require_auth_or_redirect(request)
+    if isinstance(auth, RedirectResponse):
+        return auth
+
     errors: list[str] = []
     audit_records: list[dict[str, Any]] = []
     backtest_summary: dict[str, Any] | None = None

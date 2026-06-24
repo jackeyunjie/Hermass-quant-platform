@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Hermass - 登录{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 480px; margin: 0 auto;">
+    <h1>进入 Hermass</h1>
+    <p>
+        Hermass 当前处于 M3 受控试点阶段。你可以自由浏览网站内容，
+        但使用策略构建、回测等功能需要有效的邀请码。
+    </p>
+
+    {% if error == "invalid_token" %}
+    <div class="alert error">
+        邀请码无效或已过期，请检查后重试。
+    </div>
+    {% endif %}
+
+    {% if token_gate_active %}
+    <form method="post" action="/onboarding/login">
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <div class="form-group">
+            <label for="invite_token">邀请码</label>
+            <input
+                type="text"
+                id="invite_token"
+                name="invite_token"
+                placeholder="请输入你的邀请码"
+                required
+                class="form-control"
+                style="width: 100%; padding: 8px; font-size: 16px;"
+            >
+        </div>
+
+        <div class="form-actions" style="margin-top: 16px;">
+            <button type="submit" class="btn primary">验证并进入</button>
+            <a href="/" class="btn secondary">返回首页</a>
+        </div>
+    </form>
+    {% else %}
+    <div class="alert info">
+        当前试点阶段已结束，邀请码验证已关闭。你可以直接开始使用。
+    </div>
+    <div class="form-actions">
+        <a href="{{ next }}" class="btn primary">开始使用</a>
+        <a href="/" class="btn secondary">返回首页</a>
+    </div>
+    {% endif %}
+
+    <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
+
+    <p style="font-size: 14px; color: #6b7280;">
+        没有邀请码？Hermass 目前仅对 M3 试点用户开放。
+        如需申请，请联系 Hermass 团队。
+    </p>
+</div>
+{% endblock %}

@@ -60,6 +60,19 @@ def _verify_invite_token(request: Request) -> str:
     raise HTTPException(status_code=403, detail="Invalid or missing invite token.")
 
 
+def _check_invite_token(request: Request) -> str | None:
+    """Return the valid token if present, or None if missing/invalid.
+
+    Non-raising version for use in pages that should redirect instead of 403.
+    """
+    if not TOKEN_GATE_ACTIVE:
+        return ""
+    token = request.query_params.get("invite") or request.cookies.get(INVITE_COOKIE_NAME)
+    if token and token in VALID_INVITE_TOKENS:
+        return token
+    return None
+
+
 def _set_invite_cookie(response: Any, token: str) -> None:
     """Persist valid invite token in httponly cookie."""
     if token:
@@ -177,7 +190,7 @@ def _compute_diagnosis(answers: dict[str, str]) -> DiagnosisResult:
 @router.get("/")
 async def disclaimer(request: Request) -> HTMLResponse:
     """Show the M3 pilot disclaimer/consent form."""
-    token = _verify_invite_token(request)
+    token = _check_invite_token(request)
     response = templates.TemplateResponse(
         request,
         "onboarding/disclaimer.html",
@@ -192,13 +205,61 @@ async def disclaimer(request: Request) -> HTMLResponse:
     return response
 
 
+@router.get("/login")
+async def login_page(
+    request: Request,
+    next: str = "/",
+) -> HTMLResponse:
+    """Show the invite token login form.
+
+    Publicly accessible. Users can browse the site but need a valid
+    invite token to use features (strategy lab, backtest, etc.).
+    """
+    error = request.query_params.get("error", "")
+    return templates.TemplateResponse(
+        request,
+        "onboarding/login.html",
+        {
+            "request": request,
+            "next": next,
+            "error": error,
+            "token_gate_active": TOKEN_GATE_ACTIVE,
+        },
+    )
+
+
+@router.post("/login")
+async def login_submit(
+    request: Request,
+    invite_token: str = Form(...),
+    next: str = Form("/"),
+) -> Any:
+    """Validate invite token and set cookie."""
+    if not TOKEN_GATE_ACTIVE:
+        # Gate is inactive, allow all
+        response = RedirectResponse(url=next, status_code=303)
+        return response
+
+    if invite_token and invite_token in VALID_INVITE_TOKENS:
+        response = RedirectResponse(url=next, status_code=303)
+        _set_invite_cookie(response, invite_token)
+        return response
+
+    # Invalid token, redirect back to login with error
+    response = RedirectResponse(
+        url=f"/onboarding/login?error=invalid_token&next={next}",
+        status_code=303,
+    )
+    return response
+
+
 @router.post("/consent")
 async def consent(
     request: Request,
     agreed_items: list[str] = Form(default_factory=list),
 ) -> Any:
     """Record disclaimer consent and redirect to diagnosis."""
-    token = _verify_invite_token(request)
+    token = _check_invite_token(request)
     required = {key for key, _ in DISCLAIMER_ITEMS}
     if not required.issubset(set(agreed_items)):
         response = templates.TemplateResponse(
@@ -214,6 +275,14 @@ async def consent(
         )
         if token:
             _set_invite_cookie(response, token)
+        return response
+
+    # If no valid token, redirect to login instead of proceeding
+    if token is None:
+        response = RedirectResponse(
+            url="/onboarding/login?next=/onboarding/diagnosis",
+            status_code=303,
+        )
         return response
 
     trace_id = f"onboarding-{uuid4().hex[:12]}"
